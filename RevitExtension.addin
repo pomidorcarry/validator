@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RevitAddIns>
+  <AddIn Type="Command">
+    <Assembly>RevitExtension.dll</Assembly>
+    <FullClassName>RevitExtension.Command</FullClassName>
+    <ClientId>ce5cb84d-e3cc-48e1-b17c-56948eb06eb6</ClientId>
+    <Name>Revit Extension</Name>
+    <VendorId>Vendor</VendorId>
+    <VendorDescription>Description</VendorDescription>
+  </AddIn>
+</RevitAddIns>
