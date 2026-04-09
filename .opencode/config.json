@@ -1,0 +1,20 @@
+{
+  "$schema": "https://opencode.ai/schema/config.json",
+  "mcp": {
+    "servers": {
+      "context7": {
+        "command": "npx",
+        "args": ["-y", "@upstash/context7-mcp"],
+        "env": {
+          "CONTEXT7_API_KEY": "ctx7sk-eec9aecc-292a-464f-84d1-401a415f99d9"
+        }
+      }
+    }
+  },
+  "skills": [
+    {
+      "name": "revit-extension-development",
+      "path": "./skills/revit-extension"
+    }
+  ]
+}

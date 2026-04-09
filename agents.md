@@ -1,15 +1,9 @@
 # Revit C# Extension Development Guide
 
-## Project Overview
-
-This is a **Revit plugin** written in **C# using .NET Framework 4.8**. The plugin calculates rain water flow through rain funnels (воронки) on terraces, computes areas, and performs hydraulic calculations to verify pipe capacity.
-
-### Purpose
-- Calculate rain water runoff from terrace areas
-- Link terraces to rain funnels (воронки) and vertical stacks (стояки)
-- Compute flow rates using rain intensity formulas
-- Verify if funnels/pipe capacity meets calculated demand
-- Group results by stacks and building sections
+> **Always load at the start of each chat:**
+> - Load skill: `revit-extension-development` from `./skills/revit-extension`
+> - Use MCP context7 for documentation lookup
+> - Read this agents.md file for algorithm details
 
 ---
 
