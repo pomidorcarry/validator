@@ -15,6 +15,14 @@
     {
       "name": "revit-extension-development",
       "path": "./skills/revit-extension"
+    },
+    {
+      "name": "dotnet-backend",
+      "path": "./skills/dotnet-backend"
+    },
+    {
+      "name": "agent-development",
+      "path": "./skills/agent-development"
     }
   ]
 }
