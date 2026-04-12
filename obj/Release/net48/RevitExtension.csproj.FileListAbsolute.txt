@@ -1,0 +1,10 @@
+C:\Users\varsic\Desktop\open_code_vibe_coding\RevitExtension\bin\Release\net48\RevitExtension.dll
+C:\Users\varsic\Desktop\open_code_vibe_coding\RevitExtension\bin\Release\net48\RevitExtension.pdb
+C:\Users\varsic\Desktop\open_code_vibe_coding\RevitExtension\obj\Release\net48\RevitExtension.csproj.AssemblyReference.cache
+C:\Users\varsic\Desktop\open_code_vibe_coding\RevitExtension\obj\Release\net48\RevitExtension.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\varsic\Desktop\open_code_vibe_coding\RevitExtension\obj\Release\net48\RevitExtension.AssemblyInfoInputs.cache
+C:\Users\varsic\Desktop\open_code_vibe_coding\RevitExtension\obj\Release\net48\RevitExtension.AssemblyInfo.cs
+C:\Users\varsic\Desktop\open_code_vibe_coding\RevitExtension\obj\Release\net48\RevitExtension.csproj.CoreCompileInputs.cache
+C:\Users\varsic\Desktop\open_code_vibe_coding\RevitExtension\obj\Release\net48\RevitExtension.sourcelink.json
+C:\Users\varsic\Desktop\open_code_vibe_coding\RevitExtension\obj\Release\net48\RevitExtension.dll
+C:\Users\varsic\Desktop\open_code_vibe_coding\RevitExtension\obj\Release\net48\RevitExtension.pdb
