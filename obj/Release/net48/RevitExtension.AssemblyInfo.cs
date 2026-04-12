@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("RevitExtension")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+532fcd461cf474ed317ae393641d8c29f31f078e")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b6166eb20f057896484e110ed9ba2b97a1441f5e")]
 [assembly: System.Reflection.AssemblyProductAttribute("RevitExtension")]
 [assembly: System.Reflection.AssemblyTitleAttribute("RevitExtension")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
