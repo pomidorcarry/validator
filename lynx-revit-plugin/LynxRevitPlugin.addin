@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RevitAddIns>
+  <AddIn Type="Application">
+    <Assembly>LynxRevitPlugin.dll</Assembly>
+    <FullClassName>LynxRevitPlugin.App</FullClassName>
+    <ClientId>9d993849-b038-468f-a02f-56b009d96df2</ClientId>
+    <Name>Lynx Revit Plugin</Name>
+    <VendorId>Lynx</VendorId>
+    <VendorDescription>Lynx BIM Validation Plugin</VendorDescription>
+  </AddIn>
+</RevitAddIns>

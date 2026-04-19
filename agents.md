@@ -1,695 +1,364 @@
-# Revit C# Extension Development Guide
+# Lynx MVP - Гибридная openBIM-система
 
 > **Always load at the start of each chat:**
-> - Load skill: `revit-extension-development` from `./skills/revit-extension`
+> - For Python: Load skill `python-patterns` from `.opencode/skills/python_dev`
+> - For C# / Revit: Load skill `revit-extension` from `.opencode/skills/revit-extension`
 > - Use MCP context7 for documentation lookup
-> - Read this agents.md file for algorithm details
+> - Read this agents.md file for architecture details
+> - **При всех значимых изменениях обновляй документацию в DOCS.md**
 
 ---
 
-## Architecture Overview
+## Executive Summary
 
-The plugin is divided into three main parts:
+**Lynx** — гибридная openBIM-система для автоматической проверки BIM-моделей:
 
-### 1. Data Collection (Сбор данных из модели)
-Retrieve elements from the BIM model using Revit API:
-- **Rooms** (помещения) - for terrace identification
-- **PlumbingFixtures** (сантехнические приборы) - for rain funnels
-- **PipeCurves** (трубы) - for vertical stacks
-- **Levels** (уровни) - for floor/elevation context
+1. **Revit-плагин** экспортирует IFC и отправляет на сервер
+2. **FastAPI backend** принимает, версионирует и обрабатывает модель
+3. **IfcOpenShell/Ifc2Sql** нормализует IFC в индекс элементов
+4. **Rule Engine** выполняет формальные проверки (IDS + Python)
+5. **AI-модуль** помогает формализовать ТЗ, сопоставлять параметры, искать аномалии
+6. **xeokit Viewer** визуализирует модель и связывает с issues
 
-### 2. Binding Logic (Логика привязки)
-Determine relationships between elements:
-- Which terrace belongs to which funnel
-- Which funnel connects to which stack
+---
 
-### 3. Calculation (Расчёт)
-Perform hydraulic computations:
-- Calculate flow rates based on area and rain intensity
-- Verify capacity against maximum allowable flow
-- Summarize results by stack and section
+## Architecture Layers
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Desktop Layer (Revit Plugin)                             │
+│  - IFC Export via Document.Export()                         │
+│  - multipart/form-data upload via HttpClient                 │
+└─────────────────────────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Server Layer (FastAPI)                                   │
+│  - Upload API, Storage, Versioning                        │
+│  - IFC Normalization (IfcOpenShell)                     │
+│  - Rule Engine (IDS + Python)                           │
+│  - AI Module (semantic mapping, anomaly detection)       │
+│  - Report Generation                                    │
+└─────────────────────────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Frontend Layer                                         │
+│  - xeokit XKT Viewer                                   │
+│  - Issue List, Rule Editor, AI Suggestions              │
+│  - Diff/History View                                  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Technology Stack
+
+| Layer | Technology | Purpose |
+|-------|-----------|---------|
+| Desktop | C#, Revit API, HttpClient | IFC export & upload |
+| Backend | FastAPI, Pydantic, SQLAlchemy | REST API, validation |
+| DB | SQLite (MVP) / PostgreSQL | Storage, elements, issues |
+| IFC Parsing | IfcOpenShell, Ifc2Sql | Normalization |
+| Rules | IfcTester, Python eval | Formal checks |
+| AI | LLM + RAG, sklearn | Semantic mapping, anomaly |
+| Vector Store | FAISS (MVP) / Weaviate | Embeddings |
+| Viewer | xeokit, XKT | 3D visualization |
 
 ---
 
 ## Project Structure
 
 ```
-RevitExtension/
-├── RevitExtension.csproj              # Project file
-├── RevitExtension.addin               # Addin manifest
-├── Commands/
-│   └── RainFlowCalculationCommand.cs  # Main command entry point
-├── Services/
-│   ├── DataCollector.cs               # Collect elements from model
-│   ├── TerraceBinder.cs               # Bind terraces to funnels
-│   ├── StackBinder.cs                 # Bind funnels to stacks
-│   └── RainFlowCalculator.cs           # Perform calculations
-├── Models/
-│   ├── Terrace.cs                     # Terrace data model
-│   ├── RainFunnel.cs                  # Rain funnel model
-│   ├── Stack.cs                       # Vertical stack model
-│   └── CalculationResult.cs           # Result data model
-├── UI/
-│   ├── RainFlowForm.cs                # Windows Forms UI
-│   └── RainFlowViewModel.cs           # UI logic
-├── Tools/
-│   └── UnitConverter.cs               # Convert feet to meters
-└── Properties/
-    └── AssemblyInfo.cs                # Assembly metadata
+Lynx/
+├── lynx-revit-plugin/           # C# Revit add-in
+│   ├── LynxRevitPlugin.csproj
+│   ├── LynxRevitPlugin.addin
+│   ├── Commands/
+│   │   └── ExportIfcCommand.cs
+│   └── Services/
+│       └── IfcExporter.cs
+│
+├── lynx-backend/             # Python FastAPI server
+│   ├── app/
+│   │   ├── main.py
+│   │   ├── api/
+│   │   │   └── v1/
+│   │   │       ├── models.py
+│   │   │       ├── issues.py
+│   │   │       └── rules.py
+│   │   ├── services/
+│   │   │   ├── ifc_normalizer.py
+│   │   │   ├── rule_engine.py
+│   │   │   ├── ai_module.py
+│   │   │   └── report_generator.py
+│   │   ├── db/
+│   │   │   ├── models.py
+│   │   │   └── migrations/
+│   │   └── core/
+│   │       └── config.py
+│   ├── tests/
+│   │   ├── unit/
+│   │   ├── integration/
+│   │   └── e2e/
+│   ├── pyproject.toml
+│   └── requirements.txt
+│
+└── lynx-frontend/          # React/Vue + xeokit
+    ├── src/
+    │   ├── components/
+    │   ├── views/
+    │   └── services/
+    └── package.json
 ```
 
 ---
 
-## .csproj Configuration
+## API Endpoints
 
-```xml
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <TargetFramework>net48</TargetFramework>
-    <UseWindowsForms>true</UseWindowsForms>
-    <OutputType>Library</OutputType>
-    <RootNamespace>RevitExtension</RootNamespace>
-    <PlatformTarget>x64</PlatformTarget>
-  </PropertyGroup>
-  <ItemGroup>
-    <Reference Include="RevitAPI">
-      <HintPath>C:\Program Files\Autodesk\Revit 2025\RevitAPI.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="RevitAPIUI">
-      <HintPath>C:\Program Files\Autodesk\Revit 2025\RevitAPIUI.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-  </ItemGroup>
-</Project>
-```
+### Models API
+- `POST /api/v1/models/upload` — загрузка IFC (202 Accepted)
+- `GET /api/v1/models/{model_version_id}` — получить модель
+- `GET /api/v1/models/{model_version_id}/status` — статус обработки
+- `POST /api/v1/models/{model_version_id}/reprocess` — перезапуск
 
----
+### Issues API
+- `GET /api/v1/models/{model_version_id}/issues` — список issues
+- `GET /api/v1/issues/{issue_id}` — детали issue
 
-## Algorithm Steps
+### Rules API
+- `GET /api/v1/rulesets` — список rulesets
+- `POST /api/v1/rulesets` — создать ruleset
+- `PUT /api/v1/rulesets/{id}` — обновить правило
 
-### Step 1: Find Terraces (Поиск террас)
+### AI API
+- `POST /api/v1/ai/semantic-mapping` — предложить mapping
+- `POST /api/v1/ai/anomaly-detection` — найти аномалии
+- `POST /api/v1/ai/draft-rule` — сгенерировать правило из ТЗ
 
-**Goal**: Identify rooms that are terraces/balconies.
-
-**Implementation**:
-```csharp
-// Get all rooms using FilteredElementCollector
-var roomCollector = new FilteredElementCollector(doc)
-    .OfCategory(BuiltInCategory.OST_Rooms)
-    .WhereElementIsNotElementType();
-
-// Filter by name using configurable keywords
-var terraceKeywords = new[] { "терраса", "лоджия", "balcony", "terrace", "roof terrace" };
-
-var terraces = roomCollector
-    .Cast<Room>()
-    .Where(r => IsTerrace(r, terraceKeywords))
-    .ToList();
-
-bool IsTerrace(Room room, string[] keywords)
-{
-    var roomName = room.Name?.ToLower() ?? "";
-    return keywords.Any(k => roomName.Contains(k.ToLower()));
-}
-```
-
-**Notes**:
-- Use a configurable/customizable keyword list (not hardcoded)
-- Store keywords in a settings file or input dialog
-- Consider using room properties/parameters for more reliable identification
+### Reports API
+- `GET /api/v1/models/{model_version_id}/report` — получить отчёт
 
 ---
 
-### Step 2: Get Area (Получение площади)
+## Database Schema
 
-**Goal**: Extract room area and convert to square meters.
-
-**Implementation**:
-```csharp
-// Room.Area returns value in square feet
-double GetAreaInSquareMeters(Room room)
-{
-    double areaInSquareFeet = room.Area;
-    // Convert to square meters (1 sq ft = 0.092903 sq m)
-    return areaInSquareFeet * 0.092903;
-}
-
-// Or use UnitConverter
-double areaM2 = UnitUtils.Convert(room.Area, DisplayUnitType.DUT_SQUARE_FEET, 
-                                   DisplayUnitType.DUT_SQUARE_METERS);
-```
-
-**Notes**:
-- Revit internally uses feet for area calculations
-- Always convert to metric (m²) for calculations
-- Use `UnitUtils.Convert()` for proper unit handling
+### Tables
+- **projects** — id, code, name, created_at
+- **rulesets** — id, name, version, status, source_text, ids_xml
+- **model_versions** — id, project_id, ruleset_id, status, source_filename, ifc_hash, processed_at
+- **artifacts** — id, model_version_id, artifact_type, path
+- **elements** — id, model_version_id, global_id, ifc_class, name, raw_psets_jsonb, normalized_jsonb
+- **element_measurements** — id, element_id, key, value_num, unit
+- **issues** — id, model_version_id, element_id, rule_key, severity, message, status
+- **ai_suggestions** — id, model_version_id, suggestion_type, candidate_jsonb, score, state
+- **audit_log** — id, entity_type, entity_id, action, payload_jsonb
+- **reports** — id, model_version_id, report_type, path, summary_jsonb
 
 ---
 
-### Step 3: Find Rain Funnels (Поиск воронок)
+## Normalized Element Format
 
-**Goal**: Identify rain funnel elements in the model.
-
-**Implementation**:
-```csharp
-// Find PlumbingFixtures - these include rain funnels
-var funnelCollector = new FilteredElementCollector(doc)
-    .OfCategory(BuiltInCategory.OST_PlumbingFixtures)
-    .WhereElementIsNotElementType();
-
-var funnels = funnelCollector
-    .Cast<FamilyInstance>()
-    .Where(f => IsRainFunnel(f))
-    .ToList();
-
-bool IsRainFunnel(FamilyInstance instance)
+```json
 {
-    // Filter by family name or parameter
-    var familyName = instance.Symbol?.FamilyName?.ToLower() ?? "";
-    return familyName.Contains("воронка") || 
-           familyName.Contains("rain") ||
-           familyName.Contains("funnel");
-}
-```
-
-**Notes**:
-- Category `OST_PlumbingFixtures` includes various plumbing fixtures
-- Filter by family name or a specific parameter to identify rain funnels
-- Some models may have incorrect/missing family names - consider adding a parameter for identification
-
----
-
-### Step 4: Bind Terrace to Funnel (Привязка террасы к воронке)
-
-**Goal**: Determine which funnel drains which terrace.
-
-**Primary Method** (Recommended):
-```csharp
-// Check if funnel point is inside room boundary
-bool IsFunnelInRoom(Room room, FamilyInstance funnel)
-{
-    XYZ funnelLocation = funnel.Location as XYZ;
-    if (funnelLocation == null) return false;
-    
-    return room.IsPointInRoom(funnelLocation);
-}
-```
-
-**Alternative Methods**:
-
-**BoundingBox Approach**:
-```csharp
-bool IsFunnelInRoomByBoundingBox(Room room, FamilyInstance funnel)
-{
-    BoundingBoxXYZ roomBB = room.get_BoundingBox(null);
-    BoundingBoxXYZ funnelBB = funnel.get_BoundingBox(null);
-    
-    if (roomBB == null || funnelBB == null) return false;
-    
-    return roomBB.Contains(funnelBB.Min) || roomBB.Contains(funnelBB.Max);
-}
-```
-
-**Nearest Funnel Approach** (Less Accurate):
-```csharp
-FamilyInstance FindNearestFunnel(Room room, IEnumerable<FamilyInstance> funnels)
-{
-    XYZ roomCenter = GetRoomCenter(room);
-    return funnels
-        .OrderBy(f => GetDistance(roomCenter, GetFunnelLocation(f)))
-        .FirstOrDefault();
-}
-```
-
-**Notes**:
-- `Room.IsPointInRoom()` is the most reliable method
-- Requires properly closed room boundaries
-- BoundingBox approach is less accurate but more tolerant of geometry issues
-
----
-
-### Step 5: Calculate Facade Area (Учёт фасада)
-
-**Goal**: Include vertical wall area above the funnel in flow calculation.
-
-**Implementation**:
-```csharp
-// Calculate additional facade area contribution
-double CalculateFacadeAreaContribution(
-    double terraceLevel, 
-    double buildingTopLevel,
-    double influenceWidth)
-{
-    double facadeHeight = buildingTopLevel - terraceLevel;
-    return facadeHeight * influenceWidth;
-}
-```
-
-**Notes**:
-- Add vertical wall area above the terrace to account for rain hitting the facade
-- Typically calculated as: height from terrace level to building top × influence width
-- Use configurable coefficient or user-specified parameter
-- Influence width can be based on typical catchment area (e.g., 2-3 meters)
-
----
-
-### Step 6: Calculate Flow Rate (Расчёт расхода)
-
-**Goal**: Compute rain water flow using the formula Q = q × F
-
-**Formula**:
-```
-Q = q × F × ψ
-
-Where:
-- Q = Flow rate (liters/second or m³/s)
-- q = Rain intensity (L/s·m² or according to local code)
-- F = Total catchment area (m²) = terrace area + facade area
-- ψ = Runoff coefficient (dimensionless, typically 0.3-0.9 for terraces)
-```
-
-**Implementation**:
-```csharp
-public double CalculateFlowRate(
-    double terraceAreaM2, 
-    double facadeAreaM2, 
-    double rainIntensity, 
-    double runoffCoefficient)
-{
-    double totalArea = terraceAreaM2 + facadeAreaM2;
-    return rainIntensity * totalArea * runoffCoefficient;
-}
-
-// Example values:
-// Rain intensity q = 0.048 L/s·m² (for heavy rain - adjust per local code)
-// Runoff coefficient ψ = 0.9 for terraces (impermeable surface)
-```
-
-**Notes**:
-- Rain intensity depends on local climate/standards (e.g., SP 30.13330, SNiP)
-- Runoff coefficient varies by surface type:
-  - Concrete/roofing: 0.9-1.0
-  - Gravel/ballast: 0.6-0.7
-  - Green roof: 0.3-0.5
-
----
-
-### Step 7: Determine Stacks (Определение стояков)
-
-**Goal**: Identify vertical pipes that receive flow from funnels.
-
-**Implementation**:
-```csharp
-// Find vertical pipes (stacks)
-var pipeCollector = new FilteredElementCollector(doc)
-    .OfCategory(BuiltInCategory.OST_PipeCurves)
-    .WhereElementIsNotElementType();
-
-var stacks = pipeCollector
-    .Cast<Pipe>()
-    .Where(p => IsVerticalStack(p))
-    .ToList();
-
-bool IsVerticalStack(Pipe pipe)
-{
-    // Check if pipe is primarily vertical
-    var startPoint = pipe.Location as LocationCurve;
-    if (startPoint == null) return false;
-    
-    XYZ start = startPoint.Curve.GetEndPoint(0);
-    XYZ end = startPoint.Curve.GetEndPoint(1);
-    
-    double zDiff = Math.Abs(end.Z - start.Z);
-    double length = startPoint.Curve.Length;
-    
-    // Consider vertical if angle > 80 degrees from horizontal
-    return zDiff / length > 0.98;
-}
-```
-
-**Alternative**: Use MEP Systems to identify stack groups:
-```csharp
-// Group pipes by MEP system
-var stackSystems = pipeCollector
-    .Cast<Pipe>()
-    .Select(p => p.MEPModel?.MechanicalSystem)
-    .Where(s => s != null && s.Name.Contains("Водосток"))
-    .Distinct();
-```
-
-**Notes**:
-- Filter by pipe direction or use MEP system information
-- Check for system type "Water Supply" or custom parameter
-- May need to filter by pipe diameter (stacks are typically DN70-DN150)
-
----
-
-### Step 8: Group Funnels by Stack (Группировка воронок по стоякам)
-
-**Goal**: Associate each funnel with its downstream stack.
-
-**Implementation**:
-```csharp
-// Option 1: By connection (most accurate)
-var funnelToStack = new Dictionary<ElementId, ElementId>();
-
-foreach (var funnel in funnels)
-{
-    var connector = GetConnectors(funnel).FirstOrDefault();
-    if (connector != null)
-    {
-        var connectedElement = connector.Owner;
-        if (connectedElement is Pipe)
-        {
-            funnelToStack[funnel.Id] = connectedElement.Id;
-        }
+  "global_id": "3bJQxL4Jf8zvA4HkQ1yN2V",
+  "ifc_class": "IfcPipeSegment",
+  "name": "Труба В1 DN50",
+  "type_name": "Pipe DN50 Steel",
+  "storey_name": "L2",
+  "system_name": "В1",
+  "raw_props": {
+    "Pset_PipeSegmentCommon": {
+      "Reference": "DN50",
+      "Status": "NEW"
     }
+  },
+  "canonical": {
+    "diameter_mm": 50.0,
+    "diameter_source": "UserPset.Diameter",
+    "material": "Steel"
+  }
 }
-
-// Option 2: By proximity (if connections unavailable)
-var funnelStackMapping = funnels
-    .Select(f => new 
-    { 
-        Funnel = f,
-        Stack = stacks.OrderBy(s => GetDistance(f, s)).First()
-    })
-    .ToDictionary(x => x.Funnel.Id, x => x.Stack.Id);
 ```
-
-**Notes**:
-- Use connector information for accurate binding
-- Fall back to proximity if connection data is unavailable
-- May need to traverse pipe network to find the main stack
 
 ---
 
-### Step 9: Group by Section (Группировка по секциям)
+## Rule Engine
 
-**Goal**: Organize stacks by building section/facade.
-
-**Implementation**:
-```csharp
-// Group stacks by section parameter
-var stacksBySection = stacks
-    .GroupBy(s => GetSectionParameter(s))
-    .ToDictionary(g => g.Key, g => g.ToList());
-
-string GetSectionParameter(Stack stack)
+### Rule Format (JSON)
+```json
 {
-    // Try to get section from parameter
-    Parameter sectionParam = stack.get_Parameter("Секция");
-    if (sectionParam != null && sectionParam.HasValue)
-        return sectionParam.AsString();
-    
-    // Fallback: determine by location/coordinate
-    return DetermineSectionByLocation(stack);
+  "rule_key": "viv.pipe.diameter.required_range",
+  "applies_to": {
+    "ifc_classes": ["IfcPipeSegment"],
+    "where": [{"field": "system_name", "op": "eq", "value": "В1"}]
+  },
+  "check": {
+    "field": "canonical.diameter_mm",
+    "op": "between",
+    "min": 20,
+    "max": 500
+  },
+  "severity": "error",
+  "message_template": "Диаметр должен быть в диапазоне 20..500 мм"
 }
 ```
 
-**Notes**:
-- Use a dedicated parameter (e.g., "Секция" or "Section") on stack elements
-- If parameter doesn't exist, determine by location (X/Y coordinates)
-- Building sections typically correspond to different facades
+### Supported Operators
+- `exists`, `not_exists`
+- `eq`, `neq`
+- `in`, `not_in`
+- `regex`
+- `between`
+- `gt`, `gte`, `lt`, `lte`
+
+### Priority System
+| Priority | Type | Purpose |
+|----------|------|--------|
+| 100 | schema/pre-check | Валидность IFC |
+| 200 | critical mandatory | Обязательные параметры |
+| 300 | naming/classification | Именование, классификация |
+| 400 | informational | Предупреждения |
+| 500 | AI hints | AI-подсказки |
 
 ---
 
-### Step 10: Verify Capacity (Проверка пропускной способности)
+## AI Module
 
-**Goal**: Compare calculated flow vs. maximum allowable flow.
+### Functions
+1. **Draft Rules from Text** — из ТЗ генерировать candidate rule
+2. **Semantic Mapping** — сопоставить неизвестные свойства с canonical
+3. **Anomaly Detection** — найти аномальные значения
 
-**Implementation**:
-```csharp
-public CapacityCheckResult VerifyCapacity(
-    double calculatedFlow, 
-    FamilyInstance funnel)
-{
-    // Get maximum flow from family parameter
-    double maxFlow = GetMaxFlowFromFamily(funnel);
-    
-    bool isOverloaded = calculatedFlow > maxFlow;
-    
-    return new CapacityCheckResult
-    {
-        CalculatedFlow = calculatedFlow,
-        MaxFlow = maxFlow,
-        IsOverloaded = isOverloaded,
-        Status = isOverloaded ? "Перегрузка" : "Норма"
-    };
-}
+### Anomaly Detection Algorithm
+- **IsolationForest** — первый выбор для MVP
+- **OneClassSVM** — для однородных датасетов
 
-double GetMaxFlowFromFamily(FamilyInstance funnel)
-{
-    Parameter maxFlowParam = funnel.get_Parameter("Макс_расход");
-    if (maxFlowParam != null && maxFlowParam.HasValue)
-        return maxFlowParam.AsDouble();
-    
-    // Fallback: use table lookup based on funnel type/size
-    return GetDefaultMaxFlow(funnel.Symbol.FamilyName);
-}
+### AI Workflow
+```
+AI generates candidate → Validator checks → Dry-run → User approval → Audit Log
 ```
 
-**Notes**:
-- Add "Макс_расход" (MaxFlow) parameter to family definition
-- Maximum flow depends on funnel size/type (typically 3-12 L/s)
-- Display clear indication: "OK" or "OVERLOAD"
+### AI State Machine
+- draft → validated_structure → tested_on_sample → approved/rejected → expired
 
 ---
 
-### Step 11: Output Results (Вывод результата)
+## Development Roadmap
 
-**Goal**: Display results to user in a clear format.
+### Sprint A: Revit Export/Upload
+- Плагин экспортирует IFC
+- Отправляет на сервер
+- **Критерий**: 202 Accepted, файл в storage
 
-**Output Data Structure**:
-```csharp
-public class CalculationResult
-{
-    public string TerraceName { get; set; }
-    public double TerraceArea { get; set; }          // m²
-    public string FunnelName { get; set; }
-    public string StackId { get; set; }
-    public string Section { get; set; }
-    public double CalculatedFlow { get; set; }       // L/s
-    public double MaxFlow { get; set; }              // L/s
-    public string Status { get; set; }               // "Норма" or "Перегрузка"
-}
-```
+### Sprint B: Backend Ingestion
+- model_versions, artifacts
+- Статусы обработки
+- **Критерий**: uploaded → queued → processing → processed/failed
 
-**Display Options**:
-1. **DataGridView** in Windows Forms - sortable table
-2. **TaskDialog** - simple popup with summary
-3. **Excel export** - detailed report
-4. **Visual highlighting** - color elements in model (green=OK, red=overload)
+### Sprint C: IFC Normalization
+- elements index
+- canonical fields
+- **Критерий**: 4 класса стабильно извлекаются
 
-**Visual Indication in Model** (Optional):
-```csharp
-// Use transaction to modify element colors
-using (var tx = new Transaction(doc, "Highlight Results"))
-{
-    tx.Start();
-    
-    // Change element color based on status
-    foreach (var result in results)
-    {
-        if (result.Status == "Перегруз")
-            SetElementColor(result.FunnelId, Color.Red);
-    }
-    
-    tx.Commit();
-}
-```
+### Sprint D: Rule Engine
+- IDS + 10-15 Python checks
+- Issues в БД, JSON/HTML report
+- **Критерий**: осмысленные errors/warnings
+
+### Sprint E: Viewer/UI
+- XKT загрузка
+- Привязка issues к объектам
+- **Критерий**: клик по issue → подсветка объекта
+
+### Sprint F: AI Mapping + Anomaly
+- Candidate mappings
+- Anomaly list
+- **Критерий**: AI suggestions в UI, approval flow
+
+### Sprint G: Diff/History
+- Сравнение версий
+- **Критерий**: new/resolved/persistent в report
+
+### Sprint H: Tests/Demo
+- E2E demo
+- Метрики
+- **Критерий**: стенд для защиты
 
 ---
 
-## User Workflow (Сценарий работы пользователя)
+## MVP Categories & Checks
 
-1. **Launch Plugin**: User selects the plugin from Revit ribbon or Add-Ins tab
-2. **Select Floors** (Optional): User selects which levels to process
-3. **Configuration** (Optional): User adjusts:
-   - Terrace identification keywords
-   - Rain intensity value
-   - Runoff coefficient
-   - Facade influence parameters
-4. **Processing**:
-   - Plugin finds all terraces on selected floors
-   - Plugin identifies rain funnels
-   - Plugin binds terraces to funnels
-   - Plugin calculates flow rates
-   - Plugin groups by stacks and sections
-5. **View Results**: Plugin displays results table
-6. **Optional**: Export to Excel or highlight overloaded elements
+### Categories (MVP)
+- IfcPipeSegment
+- IfcPipeFitting
+- IfcValve
+- IfcFlowTerminal
 
----
-
-## Common Problems and Solutions
-
-### 1. Model Data Issues (Ошибки в моделях)
-- **Symptom**: Terraces not found, wrong rooms detected
-- **Cause**: Inconsistent naming, missing rooms, incorrect boundaries
-- **Solution**: 
-  - Add custom parameter for terrace identification
-  - Validate room boundaries before processing
-  - Provide keyword configuration dialog
-
-### 2. Funnel Location (Воронки могут не попадать точно в границы)
-- **Symptom**: Funnel not bound to any terrace
-- **Cause**: Funnel placed slightly outside room boundary
-- **Solution**:
-  - Use BoundingBox method as fallback
-  - Add tolerance (e.g., 0.5m buffer)
-  - Allow manual binding override
-
-### 3. Stack Structure (Сложная структура стояков)
-- **Symptom**: Incorrect funnel-to-stack binding
-- **Cause**: Complex pipe networks, multiple connections
-- **Solution**:
-  - Follow pipe connections through the system
-  - Use MEP system hierarchy
-  - Allow user to specify stack manually
-
-### 4. Unit Conversion (Необходимость перевода единиц)
-- **Symptom**: Incorrect calculations, values off by factor
-- **Cause**: Using feet instead of meters, wrong unit handling
-- **Solution**:
-  - Always use `UnitUtils.Convert()` for unit handling
-  - Document expected units in UI (m², L/s)
-  - Validate input/output units
+### Checks (~15-25 rules)
+1. Наличие имени
+2. Regex имени
+3. Наличие системы
+4. Наличие диаметра
+5. Диапазон диаметра (20-500mm)
+6. Согласованность name ↔ diameter_mm
+7. Допустимые материалы
+8. Обязательные pset-поля
+9. Заполненность классификации
+10. Аномальные значения в группе
 
 ---
 
-## Development Recommendations
+## Testing Metrics
 
-### Phase 1: Simplified Version
-Start with a basic implementation:
-- Process single floor only
-- Simple terrace-to-funnel binding (nearest)
-- Basic flow calculation
-- Simple output (TaskDialog)
-
-### Phase 2: Add Family Parameters
-Enhance family definitions:
-- Add "Макс_расход" (MaxFlow) parameter to funnel families
-- Add "Секция" (Section) parameter to pipe families
-- Add custom identification parameter for terraces
-
-### Phase 3: Advanced Features
-- Multi-floor processing with level selection
-- User-configurable calculation parameters
-- Excel report export
-- Visual highlighting in model
-
-### Debugging Tips
-- Use `TaskDialog.Show()` for quick debugging output
-- Visualize intermediate data in model (color code elements)
-- Log detailed error messages with element IDs
-- Test with simplified/small model first
-
----
-
-## Coding Best Practices
-
-### Transaction Management
-```csharp
-[Transaction(TransactionMode.Manual)]
-public class RainFlowCalculationCommand : IExternalCommand
-{
-    public Result Execute(
-        ExternalCommandData commandData,
-        ref string message,
-        ElementSet elements)
-    {
-        var doc = commandData.Application.ActiveUIDocument.Document;
-        
-        using (var tx = new Transaction(doc, "Calculate Rain Flow"))
-        {
-            try
-            {
-                tx.Start();
-                
-                // Run calculation
-                var results = CalculateRainFlow(doc);
-                
-                tx.Commit();
-                
-                // Show results (outside transaction)
-                ShowResults(results);
-                
-                return Result.Succeeded;
-            }
-            catch (Exception ex)
-            {
-                tx.RollBack();
-                message = ex.Message;
-                return Result.Failed;
-            }
-        }
-    }
-}
-```
-
-### Element Access
-```csharp
-// Use FilteredElementCollector for efficiency
-var collector = new FilteredElementCollector(doc)
-    .OfCategory(BuiltInCategory.OST_Rooms)
-    .WhereElementIsNotElementType();
-
-// Always check for null
-var element = doc.GetElement(elementId);
-if (element == null) return;
-```
-
-### Error Handling
-- Catch specific exceptions
-- Log element IDs for debugging
-- Provide meaningful error messages
-- Continue processing on non-critical errors
+| Metric | Purpose |
+|--------|--------|
+| Precision | Доля корректных замечаний |
+| Recall | Доля найденных ошибок |
+| F1 | Баланс precision/recall |
+| Time-to-check | Время от upload до отчёта |
+| Rule authoring time | Время создания правила |
+| AI acceptance rate | Доля утверждённых AI |
+| Issue-to-element latency | Время клик → подсветка |
 
 ---
 
 ## Deployment
 
-### Manual Installation
-1. Build in Release configuration
-2. Copy DLL to: `%APPDATA%\Autodesk\Revit\Addins\2025\`
-3. Copy .addin manifest to same location
+### MVP Setup
+```
+1 backend FastAPI
+SQLite or PostgreSQL
+Local/S3 file storage
+BackgroundTasks for processing
+```
 
-### Project Structure for Deployment
-```
-%APPDATA%\Autodesk\Revit\Addins\2025\
-├── RevitExtension.dll
-└── RevitExtension.addin
-```
+### Security
+- HTTPS/TLS
+- JWT for UI/API
+- Service token for plugin
+- File size limits
+- Extension whitelist
 
 ---
 
-## Key Revit API Categories
+## Key Risks & Mitigations
 
-| Category | BuiltInCategory | Description |
-|----------|------------------|-------------|
-| Rooms | OST_Rooms | Room elements |
-| Plumbing Fixtures | OST_PlumbingFixtures | Funnels, sinks, etc. |
-| Pipe Curves | OST_PipeCurves | Pipe segments |
-| Levels | OST_Levels | Floor/level definitions |
-| Walls | OST_Walls | Wall elements |
-| Roofs | OST_Roofs | Roof elements |
+| Risk | Mitigation |
+|------|----------|
+| Нестабильность IFC | Фиксированный профиль экспорта, узкий scope |
+| Неполные свойства | Normalized index, source-path tracking |
+| Переоценка LLM | AI only proposes, rules approve |
+| Viewer pipeline | Freeze конвертера, тестирование |
 
 ---
 
-## Additional Resources
+## Context7 Resources
 
-- Revit API Docs: https://www.revitapidocs.com/
-- Autodesk Developer Network: https://www.autodesk.com/developer
-- Russian building codes: SP 30.13330 (СНиП 2.04.01-85) - Water supply calculations
-
----
-
-## Namespace Convention
-
-```csharp
-namespace RevitExtension.Commands { }
-namespace RevitExtension.Services { }
-namespace RevitExtension.Models { }
-namespace RevitExtension.UI { }
-namespace RevitExtension.Tools { }
-```
+Для документации использовать MCP context7:
+- `/ifcopenshell/ifcopenshell` — IfcOpenShell API
+- `/autodesk/revit-api` — Revit API
+- `/tiplerlabs/xeokit` — xeokit Viewer
+- `/fastapi/fastapi` — FastAPI
+- `/python/fastapi` — Pydantic validation
+- `/scikit-learn/scikit-learn` — Anomaly detection
