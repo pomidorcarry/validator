@@ -160,6 +160,11 @@ async def process_model_version(model_version_id: str):
         issues_count = await run_rules(model_version_id)
         logger.info(f"Created {issues_count} issues")
         
+        from .xkt_converter import generate_xkt
+        xkt_success = await generate_xkt(model_version_id)
+        if xkt_success:
+            logger.info(f"XKT generated for {model_version_id}")
+        
         logger.info(f"Completed processing for {model_version_id}")
         
     except Exception as e:

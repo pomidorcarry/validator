@@ -1,6 +1,7 @@
 from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
+from sqlalchemy import delete
 import uuid
 from contextlib import asynccontextmanager
 
@@ -118,9 +119,84 @@ async def list_models():
     return {"models": models, "count": len(models)}
 
 
+@app.delete(f"{settings.api_prefix}/models")
+async def delete_all_models():
+    from .db.models import async_session, ModelVersion, Element, Issue, Artifact
+    
+    async with async_session() as session:
+        await session.execute(delete(Issue))
+        await session.execute(delete(Element))
+        await session.execute(delete(Artifact))
+        await session.execute(delete(ModelVersion))
+        await session.commit()
+    
+    import shutil
+    raw = Path(settings.storage_path) / "raw"
+    xkt = Path(settings.storage_path) / "xkt"
+    for p in [raw, xkt]:
+        if p.exists():
+            for f in p.glob("*"):
+                f.unlink()
+    
+    return {"deleted": True}
+
+
+@app.delete(f"{settings.api_prefix}/models/{{model_version_id}}")
+async def delete_model(model_version_id: str):
+    from .db.models import async_session, ModelVersion, Element, Issue, Artifact
+    
+    async with async_session() as session:
+        await session.execute(delete(Issue).where(Issue.model_version_id == model_version_id))
+        await session.execute(delete(Element).where(Element.model_version_id == model_version_id))
+        await session.execute(delete(Artifact).where(Artifact.model_version_id == model_version_id))
+        await session.execute(delete(ModelVersion).where(ModelVersion.id == model_version_id))
+        await session.commit()
+    
+    import shutil
+    raw = Path(settings.storage_path) / "raw" / f"{model_version_id}.ifc"
+    xkt = Path(settings.storage_path) / "xkt" / f"{model_version_id}.xkt"
+    for f in [raw, xkt]:
+        if f.exists():
+            f.unlink()
+    
+    return {"deleted": model_version_id}
+
+
 @app.get(f"{settings.api_prefix}/models/{{model_version_id}}/elements")
 async def get_model_elements(model_version_id: str):
     from .db.models import get_elements
     
     elements = await get_elements(model_version_id)
     return {"elements": elements, "count": len(elements)}
+
+
+@app.get(f"{settings.api_prefix}/models/{{model_version_id}}/ifc")
+async def get_model_ifc(model_version_id: str):
+    from pathlib import Path
+    
+    ifc_path = Path(settings.storage_path) / "raw" / f"{model_version_id}.ifc"
+    if not ifc_path.exists():
+        raise HTTPException(status_code=404, detail="IFC file not found")
+    
+    from fastapi.responses import FileResponse
+    return FileResponse(
+        path=str(ifc_path),
+        media_type="application/octet-stream",
+        filename=f"{model_version_id}.ifc"
+    )
+
+
+@app.get(f"{settings.api_prefix}/models/{{model_version_id}}/xkt")
+async def get_model_xkt(model_version_id: str):
+    from pathlib import Path
+    
+    xkt_path = Path(settings.storage_path) / "xkt" / f"{model_version_id}.xkt"
+    if not xkt_path.exists():
+        raise HTTPException(status_code=404, detail="XKT file not found")
+    
+    from fastapi.responses import FileResponse
+    return FileResponse(
+        path=str(xkt_path),
+        media_type="application/octet-stream",
+        filename=f"{model_version_id}.xkt"
+    )

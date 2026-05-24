@@ -35,7 +35,7 @@ namespace LynxRevitPlugin
 
             try
             {
-                TaskDialog.Show("Lynx", "Экспорт IFC начат. Это окно можно закрыть.");
+                TaskDialog.Show("Lynx", "Экспорт IFC начат.\nЭто окно можно закрыть.");
 
                 string exportFolder = GetExportFolder();
                 string ifcFileName = $"{doc.Title}_{DateTime.Now:yyyyMMdd_HHmmss}.ifc";
@@ -48,20 +48,22 @@ namespace LynxRevitPlugin
                     t.Commit();
                 }
 
-                TaskDialog.Show("Lynx", "Экспорт завершён. Начинаем отправку на сервер...");
+                TaskDialog.Show("Lynx", "Экспорт завершён.\nОтправка на сервер... (можно закрыть)");
 
-                var result = UploadIfcToServer(ifcPath, settings, doc).GetAwaiter().GetResult();
+                var resultTask = UploadIfcToServerAsync(ifcPath, settings, doc);
+                resultTask.Wait();
+                var result = resultTask.Result;
 
                 if (result.Success)
                 {
                     TaskDialog.Show("Lynx", 
-                        $"Модель успешно отправлена.\n\n" +
+                        $"Модель отправлена.\n\n" +
                         $"Model ID: {result.ModelVersionId}\n" +
                         $"Status: {result.Status}");
                 }
                 else
                 {
-                    TaskDialog.Show("Lynx", $"Ошибка отправки: {result.ErrorMessage}");
+                    TaskDialog.Show("Lynx", $"Ошибка: {result.ErrorMessage}");
                     return Result.Failed;
                 }
 
@@ -109,7 +111,7 @@ namespace LynxRevitPlugin
             }
         }
 
-        private async Task<UploadResult> UploadIfcToServer(string ifcPath, SettingsData settings, Document doc)
+        private async Task<UploadResult> UploadIfcToServerAsync(string ifcPath, SettingsData settings, Document doc)
         {
             using (var client = new HttpClient())
             {
