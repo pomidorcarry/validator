@@ -54,7 +54,7 @@ async function load3D(modelId) {
     
     try {
         const resp = await fetch(`${API_BASE}/models/${modelId}/ifc`);
-        const buffer = await resp.arrayBuffer();
+        const buffer = new Uint8Array(await resp.arrayBuffer());
         
         await loadIfcFromBuffer(buffer);
         
