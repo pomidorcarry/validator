@@ -370,7 +370,7 @@ function renderModels() {
     el.innerHTML = models.map(m => [
         '<div class="model-item ' + (m.id === selectedModelId ? 'active' : '') + '" onclick="selectModel(\'' + m.id + '\')">',
             '<div class="model-item-info">',
-                '<div class="model-item-title">' + escHtml(m.model_name) + '</div>',
+                '<div class="model-item-title">' + escHtml(m.model_name) + ' v' + (m.version_number !== null && m.version_number !== undefined ? m.version_number : '?') + '</div>',
                 '<div class="model-item-meta">',
                     '<span class="status-badge ' + m.status + '">' + getStatusBadge(m.status) + '</span>',
                     formatDate(m.created_at),
@@ -525,16 +525,45 @@ async function loadIssues(modelId) {
 function renderIssues() {
     const el = document.getElementById('issuesList');
     if (!issues.length) { el.innerHTML = '<div class="empty-state">Нет ошибок</div>'; return; }
-    el.innerHTML = issues.map(i =>
-        `<div class="issue-item ${i.severity}" onclick="showInspector('${i.global_id}')">
-            <div class="issue-header">
-                <span class="issue-badge ${i.severity}">${i.severity}</span>
-                <span class="issue-key">${escHtml(i.rule_key)}</span>
-            </div>
-            <div class="issue-message">${escHtml(i.message)}</div>
-        </div>`
-    ).join('');
+
+    var groups = {};
+    for (var i = 0; i < issues.length; i++) {
+        var key = issues[i].rule_key + '|||' + issues[i].message;
+        if (!groups[key]) groups[key] = { rule_key: issues[i].rule_key, message: issues[i].message, severity: issues[i].severity, items: [] };
+        groups[key].items.push(issues[i]);
+    }
+
+    el.innerHTML = Object.keys(groups).map(function(key) {
+        var g = groups[key];
+        var groupId = 'ig_' + key.replace(/[^a-z0-9_]/gi, '_');
+        var count = g.items.length;
+        var firstItem = g.items[0];
+        return '<div class="issue-group">' +
+            '<div class="issue-group-header" onclick="toggleIssueGroup(\'' + groupId + '\')">' +
+                '<span class="issue-group-toggle">▶</span>' +
+                '<span class="issue-badge ' + g.severity + '">' + g.severity + '</span>' +
+                '<span class="issue-key">' + escHtml(g.rule_key) + '</span>' +
+                '<span class="issue-group-count">' + count + '</span>' +
+            '</div>' +
+            '<div class="issue-group-items" id="' + groupId + '">' +
+                g.items.map(function(item) {
+                    return '<div class="issue-item ' + item.severity + '" onclick="showInspector(\'' + item.global_id + '\')">' +
+                        '<div class="issue-message">' + escHtml(item.message) + '</div>' +
+                        '<div class="issue-element-id">' + escHtml(item.global_id || '') + '</div>' +
+                    '</div>';
+                }).join('') +
+            '</div>' +
+        '</div>';
+    }).join('');
 }
+
+window.toggleIssueGroup = function(id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.classList.toggle('collapsed');
+    var toggle = el.previousElementSibling.querySelector('.issue-group-toggle');
+    if (toggle) toggle.textContent = el.classList.contains('collapsed') ? '▶' : '▼';
+};
 
 async function loadElements(modelId) {
     try {
@@ -619,70 +648,111 @@ var __CATEGORY_COLUMNS = [];
 
 var DEFAULT_CATEGORY_COLUMNS = {
     'Труба металлическая': [
-        { label: 'Секция', keys: ['Секция', 'Section'] },
-        { label: 'Часть системы', keys: ['Часть системы', 'SystemPart', 'PartOfSystem'] },
-        { label: 'Этаж', keys: ['Этаж', 'Storey', 'Level'] },
-        { label: 'Вид', keys: ['Вид', 'Type', 'PipeType'] },
-        { label: 'Размер', keys: ['Размер', 'Size', 'DN', 'NominalDiameter'] },
-        { label: 'Толщина стенки', keys: ['Толщина стенки', 'WallThickness'] },
-        { label: 'Длина, мм', keys: ['Длина', 'Length'] },
-        { label: 'Стадия', keys: ['Стадия проектирования', 'DesignStage'] },
+        { label: 'Секция', keys: ['ADSK_Номер секции', 'Секция', 'Section'], group: 'position' },
+        { label: 'Часть системы', keys: ['BRU_ЧастьСистемы'], group: 'position' },
+        { label: 'Система', keys: ['BRU_Система'], group: 'position' },
+        { label: 'Этаж', keys: ['ADSK_Этаж', 'Этаж', 'Storey', 'Level'], group: 'position' },
+        { label: 'CUBE_Сокращение', keys: ['CUBE_Сокращение'], group: 'position' },
+        { label: 'Вид', keys: ['Вид', 'Type', 'PipeType'], group: 'structural' },
+        { label: 'Размер', keys: ['Размер', 'Size', 'DN', 'NominalDiameter'], group: 'structural' },
+        { label: 'Толщина стенки', keys: ['Толщина стенки', 'WallThickness'], group: 'structural' },
+        { label: 'Длина, мм', keys: ['Длина', 'Length'], group: 'structural' },
     ],
     'Труба полимерная': [
-        { label: 'Секция', keys: ['Секция', 'Section'] },
-        { label: 'Часть системы', keys: ['Часть системы', 'SystemPart', 'PartOfSystem'] },
-        { label: 'Вид', keys: ['Вид', 'Type', 'PipeType'] },
-        { label: 'Размер', keys: ['Размер', 'Size', 'DN', 'NominalDiameter'] },
-        { label: 'Толщина стенки', keys: ['Толщина стенки', 'WallThickness'] },
-        { label: 'Длина, мм', keys: ['Длина', 'Length'] },
+        { label: 'Секция', keys: ['ADSK_Номер секции', 'Секция', 'Section'], group: 'position' },
+        { label: 'Часть системы', keys: ['BRU_ЧастьСистемы'], group: 'position' },
+        { label: 'Система', keys: ['BRU_Система'], group: 'position' },
+        { label: 'Этаж', keys: ['ADSK_Этаж', 'Этаж', 'Storey', 'Level'], group: 'position' },
+        { label: 'CUBE_Сокращение', keys: ['CUBE_Сокращение'], group: 'position' },
+        { label: 'Вид', keys: ['Вид', 'Type', 'PipeType'], group: 'structural' },
+        { label: 'Размер', keys: ['Размер', 'Size', 'DN', 'NominalDiameter'], group: 'structural' },
+        { label: 'Толщина стенки', keys: ['Толщина стенки', 'WallThickness'], group: 'structural' },
+        { label: 'Длина, мм', keys: ['Длина', 'Length'], group: 'structural' },
     ],
     'Металлическая соединительная деталь трубы': [
-        { label: 'Секция', keys: ['Секция', 'Section'] },
-        { label: 'Часть системы', keys: ['Часть системы', 'SystemPart', 'PartOfSystem'] },
-        { label: 'Вид', keys: ['Вид', 'Type', 'FittingType'] },
-        { label: 'Размер', keys: ['Размер', 'Size', 'DN', 'NominalDiameter'] },
+        { label: 'Секция', keys: ['ADSK_Номер секции', 'Секция', 'Section'], group: 'position' },
+        { label: 'Часть системы', keys: ['BRU_ЧастьСистемы'], group: 'position' },
+        { label: 'Система', keys: ['BRU_Система'], group: 'position' },
+        { label: 'Этаж', keys: ['ADSK_Этаж', 'Этаж', 'Storey', 'Level'], group: 'position' },
+        { label: 'CUBE_Сокращение', keys: ['CUBE_Сокращение'], group: 'position' },
+        { label: 'Тип', keys: ['BRU_Тип', 'Bru_Тип', 'Тип', 'Type'], group: 'structural' },
+        { label: 'Вид', keys: ['BRU_Вид', 'Bru_Вид', 'Вид', 'Type', 'FittingType', 'ValveType'], group: 'structural' },
+        { label: 'Размер', keys: ['BRU_Габарит элемента', 'Bru_Габарит элемента', 'Размер', 'Size', 'DN', 'NominalDiameter'], group: 'structural' },
+        { label: 'Материал', keys: ['Материал', 'Material'], group: 'structural' },
     ],
     'Полимерная соединительная деталь трубы': [
-        { label: 'Секция', keys: ['Секция', 'Section'] },
-        { label: 'Часть системы', keys: ['Часть системы', 'SystemPart', 'PartOfSystem'] },
-        { label: 'Вид', keys: ['Вид', 'Type', 'FittingType'] },
-        { label: 'Размер', keys: ['Размер', 'Size', 'DN', 'NominalDiameter'] },
+        { label: 'Секция', keys: ['ADSK_Номер секции', 'Секция', 'Section'], group: 'position' },
+        { label: 'Часть системы', keys: ['BRU_ЧастьСистемы'], group: 'position' },
+        { label: 'Система', keys: ['BRU_Система'], group: 'position' },
+        { label: 'Этаж', keys: ['ADSK_Этаж', 'Этаж', 'Storey', 'Level'], group: 'position' },
+        { label: 'CUBE_Сокращение', keys: ['CUBE_Сокращение'], group: 'position' },
+        { label: 'Тип', keys: ['BRU_Тип', 'Bru_Тип', 'Тип', 'Type'], group: 'structural' },
+        { label: 'Вид', keys: ['BRU_Вид', 'Bru_Вид', 'Вид', 'Type', 'FittingType', 'ValveType'], group: 'structural' },
+        { label: 'Размер', keys: ['BRU_Габарит элемента', 'Bru_Габарит элемента', 'Размер', 'Size', 'DN', 'NominalDiameter'], group: 'structural' },
+        { label: 'Материал', keys: ['Материал', 'Material'], group: 'structural' },
     ],
     'Арматура труб': [
-        { label: 'Секция', keys: ['Секция', 'Section'] },
-        { label: 'Часть системы', keys: ['Часть системы', 'SystemPart', 'PartOfSystem'] },
-        { label: 'Вид', keys: ['Вид', 'Type', 'ValveType'] },
-        { label: 'Размер', keys: ['Размер', 'Size', 'DN', 'NominalDiameter'] },
-        { label: 'Материал', keys: ['Материал', 'Material'] },
+        { label: 'Секция', keys: ['ADSK_Номер секции', 'Секция', 'Section'], group: 'position' },
+        { label: 'Часть системы', keys: ['BRU_ЧастьСистемы'], group: 'position' },
+        { label: 'Система', keys: ['BRU_Система'], group: 'position' },
+        { label: 'Этаж', keys: ['ADSK_Этаж', 'Этаж', 'Storey', 'Level'], group: 'position' },
+        { label: 'CUBE_Сокращение', keys: ['CUBE_Сокращение'], group: 'position' },
+        { label: 'Тип', keys: ['BRU_Тип', 'Bru_Тип', 'Тип', 'Type'], group: 'structural' },
+        { label: 'Вид', keys: ['BRU_Вид', 'Bru_Вид', 'Вид', 'Type', 'ValveType'], group: 'structural' },
+        { label: 'Размер', keys: ['BRU_Габарит элемента', 'Bru_Габарит элемента', 'Размер', 'Size', 'DN', 'NominalDiameter'], group: 'structural' },
+        { label: 'Материал', keys: ['Материал', 'Material'], group: 'structural' },
     ],
     'Арматура': [
-        { label: 'Секция', keys: ['Секция', 'Section'] },
-        { label: 'Часть системы', keys: ['Часть системы', 'SystemPart', 'PartOfSystem'] },
-        { label: 'Вид', keys: ['Вид', 'Type', 'ValveType'] },
-        { label: 'Размер', keys: ['Размер', 'Size', 'DN', 'NominalDiameter'] },
-        { label: 'Материал', keys: ['Материал', 'Material'] },
+        { label: 'Секция', keys: ['ADSK_Номер секции', 'Секция', 'Section'], group: 'position' },
+        { label: 'Часть системы', keys: ['BRU_ЧастьСистемы'], group: 'position' },
+        { label: 'Система', keys: ['BRU_Система'], group: 'position' },
+        { label: 'Этаж', keys: ['ADSK_Этаж', 'Этаж', 'Storey', 'Level'], group: 'position' },
+        { label: 'CUBE_Сокращение', keys: ['CUBE_Сокращение'], group: 'position' },
+        { label: 'Тип', keys: ['BRU_Тип', 'Bru_Тип', 'Тип', 'Type'], group: 'structural' },
+        { label: 'Вид', keys: ['BRU_Вид', 'Bru_Вид', 'Вид', 'Type', 'ValveType'], group: 'structural' },
+        { label: 'Размер', keys: ['BRU_Габарит элемента', 'Bru_Габарит элемента', 'Размер', 'Size', 'DN', 'NominalDiameter'], group: 'structural' },
+        { label: 'Материал', keys: ['Материал', 'Material'], group: 'structural' },
     ],
     'Оборудование': [
-        { label: 'Секция', keys: ['Секция', 'Section'] },
-        { label: 'Часть системы', keys: ['Часть системы', 'SystemPart', 'PartOfSystem', 'System'] },
-        { label: 'Тип', keys: ['Тип', 'EquipmentType', 'Type'] },
-        { label: 'Мощность', keys: ['Мощность', 'Power', 'PowerConsumption'] },
-        { label: 'Производительность', keys: ['Производительность', 'Performance', 'FlowRate'] },
+        { label: 'Секция', keys: ['ADSK_Номер секции', 'Секция', 'Section'], group: 'position' },
+        { label: 'Часть системы', keys: ['BRU_ЧастьСистемы'], group: 'position' },
+        { label: 'Система', keys: ['BRU_Система'], group: 'position' },
+        { label: 'Этаж', keys: ['ADSK_Этаж', 'Этаж', 'Storey', 'Level'], group: 'position' },
+        { label: 'CUBE_Сокращение', keys: ['CUBE_Сокращение'], group: 'position' },
+        { label: 'Тип', keys: ['BRU_Тип', 'Bru_Тип', 'Тип', 'EquipmentType', 'Type'], group: 'structural' },
+        { label: 'Вид', keys: ['BRU_Вид', 'Bru_Вид', 'Вид', 'Type'], group: 'structural' },
+        { label: 'Размер', keys: ['BRU_Габарит элемента', 'Bru_Габарит элемента', 'Размер', 'Size', 'DN'], group: 'structural' },
+        { label: 'Мощность', keys: ['Мощность', 'Power', 'PowerConsumption'], group: 'structural' },
+        { label: 'Производительность', keys: ['Производительность', 'Performance', 'FlowRate'], group: 'structural' },
     ],
     'Сантехнический прибор': [
-        { label: 'Секция', keys: ['Секция', 'Section'] },
-        { label: 'Вид', keys: ['Вид', 'Type', 'FixtureType'] },
-        { label: 'Подключение', keys: ['Подключение', 'Connection', 'ConnectionType'] },
+        { label: 'Секция', keys: ['ADSK_Номер секции', 'Секция', 'Section'], group: 'position' },
+        { label: 'Часть системы', keys: ['BRU_ЧастьСистемы'], group: 'position' },
+        { label: 'Система', keys: ['BRU_Система'], group: 'position' },
+        { label: 'Этаж', keys: ['ADSK_Этаж', 'Этаж', 'Storey', 'Level'], group: 'position' },
+        { label: 'CUBE_Сокращение', keys: ['CUBE_Сокращение'], group: 'position' },
+        { label: 'Вид', keys: ['BRU_Вид', 'Bru_Вид', 'Вид', 'Type', 'FixtureType'], group: 'structural' },
+        { label: 'Подключение', keys: ['Подключение', 'Connection', 'ConnectionType'], group: 'structural' },
     ],
     'Изоляция рулонная': [
-        { label: 'Толщина', keys: ['Толщина', 'Thickness'] },
-        { label: 'Материал', keys: ['Материал', 'Material'] },
-        { label: 'Тип', keys: ['Тип', 'Type', 'InsulationType'] },
+        { label: 'Секция', keys: ['ADSK_Номер секции', 'Секция', 'Section'], group: 'position' },
+        { label: 'Часть системы', keys: ['BRU_ЧастьСистемы'], group: 'position' },
+        { label: 'Система', keys: ['BRU_Система'], group: 'position' },
+        { label: 'Этаж', keys: ['ADSK_Этаж', 'Этаж', 'Storey', 'Level'], group: 'position' },
+        { label: 'CUBE_Сокращение', keys: ['CUBE_Сокращение'], group: 'position' },
+        { label: 'Толщина', keys: ['Толщина', 'Thickness'], group: 'structural' },
+        { label: 'Материал', keys: ['Материал', 'Material'], group: 'structural' },
+        { label: 'Тип', keys: ['BRU_Тип', 'Bru_Тип', 'Тип', 'Type', 'InsulationType'], group: 'structural' },
     ],
     'Изоляция трубчатая': [
-        { label: 'Толщина', keys: ['Толщина', 'Thickness'] },
-        { label: 'Материал', keys: ['Материал', 'Material'] },
-        { label: 'Тип', keys: ['Тип', 'Type', 'InsulationType'] },
+        { label: 'Секция', keys: ['ADSK_Номер секции', 'Секция', 'Section'], group: 'position' },
+        { label: 'Часть системы', keys: ['BRU_ЧастьСистемы'], group: 'position' },
+        { label: 'Система', keys: ['BRU_Система'], group: 'position' },
+        { label: 'Этаж', keys: ['ADSK_Этаж', 'Этаж', 'Storey', 'Level'], group: 'position' },
+        { label: 'CUBE_Сокращение', keys: ['CUBE_Сокращение'], group: 'position' },
+        { label: 'Толщина', keys: ['Толщина', 'Thickness'], group: 'structural' },
+        { label: 'Материал', keys: ['Материал', 'Material'], group: 'structural' },
+        { label: 'Тип', keys: ['BRU_Тип', 'Bru_Тип', 'Тип', 'Type', 'InsulationType'], group: 'structural' },
     ],
 };
 
@@ -699,11 +769,13 @@ function getColsForCategory(cat) {
 
 function extractProp(rawPsets, keys) {
     if (!rawPsets || typeof rawPsets !== 'object') return null;
-    for (var psetName in rawPsets) {
-        var props = rawPsets[psetName];
-        if (!props || typeof props !== 'object') continue;
-        for (var ki = 0; ki < keys.length; ki++) {
-            var val = props[keys[ki]];
+    // Try each key across ALL psets first (priority by key order)
+    for (var ki = 0; ki < keys.length; ki++) {
+        var key = keys[ki];
+        for (var psetName in rawPsets) {
+            var props = rawPsets[psetName];
+            if (!props || typeof props !== 'object') continue;
+            var val = props[key];
             if (val !== undefined && val !== null && String(val).trim() !== '') {
                 return val;
             }
@@ -797,9 +869,12 @@ function categorizeElement(el) {
     return 'Невалидируемое семейство';
 }
 
+var tzSelectedModelId = '';
+
 async function loadTzElements() {
     document.getElementById('tzPageTitle').textContent = 'Элементы';
-    document.getElementById('tzPageMeta').textContent = 'Загрузка элементов из всех моделей проекта...';
+    document.getElementById('tzPageMeta').textContent = 'Загрузка...';
+    document.getElementById('tzModelSelector').disabled = true;
 
     var allCatElems = {};
     for (var i = 0; i < CATEGORIES.length; i++) {
@@ -815,8 +890,34 @@ async function loadTzElements() {
         var projectModels = mData.models || [];
         document.getElementById('tzModelCount').textContent = projectModels.length;
 
-        for (var i = 0; i < projectModels.length; i++) {
-            var m = projectModels[i];
+        // Populate model selector
+        var sel = document.getElementById('tzModelSelector');
+        var prevVal = tzSelectedModelId || (selectedModelId ? selectedModelId : '');
+        sel.innerHTML = '<option value="">— Все модели —</option>' +
+            projectModels.map(function(m) {
+                var label = escHtml(m.model_name) + ' v' + (m.version_number !== null && m.version_number !== undefined ? m.version_number : '?');
+                return '<option value="' + m.id + '">' + label + '</option>';
+            }).join('');
+        sel.value = prevVal;
+        if (!sel.value) {
+            // Auto-select first processed model if none selected
+            var first = projectModels.find(function(m) { return m.status === 'processed'; });
+            if (first) { sel.value = first.id; tzSelectedModelId = first.id; }
+        } else {
+            tzSelectedModelId = prevVal;
+        }
+
+        // Determine which models to load
+        var modelsToLoad = [];
+        if (tzSelectedModelId) {
+            var found = projectModels.find(function(m) { return m.id === tzSelectedModelId; });
+            if (found) modelsToLoad = [found];
+        } else {
+            modelsToLoad = projectModels;
+        }
+
+        for (var i = 0; i < modelsToLoad.length; i++) {
+            var m = modelsToLoad[i];
             if (m.status !== 'processed') continue;
             try {
                 var eResp = await fetch(API_BASE + '/models/' + m.id + '/elements');
@@ -825,6 +926,7 @@ async function loadTzElements() {
                 for (var j = 0; j < elems.length; j++) {
                     var el = elems[j];
                     el._modelName = m.model_name;
+                    el._modelVersion = m.version_number;
                     var cat = categorizeElement(el);
                     if (allCatElems[cat]) {
                         allCatElems[cat].push(el);
@@ -838,6 +940,7 @@ async function loadTzElements() {
         }
     } catch(e) {
         document.getElementById('tzTable').innerHTML = '<div class="empty-message">Ошибка загрузки: ' + e.message + '</div>';
+        document.getElementById('tzModelSelector').disabled = false;
         return;
     }
 
@@ -850,12 +953,22 @@ async function loadTzElements() {
     var ifcClassNames = Object.keys(allIfcClasses).sort();
     document.getElementById('tzCount').textContent = totalCount;
     document.getElementById('tzClassCount').textContent = ifcClassNames.length;
-    document.getElementById('tzPageMeta').textContent = 'Всего элементов: ' + totalCount + ' · Классов IFC: ' + ifcClassNames.length;
+    var modelLabel = tzSelectedModelId ? '' : 'всех моделей — ';
+    document.getElementById('tzPageMeta').textContent = 'Элементов: ' + totalCount + ' · Классов IFC: ' + ifcClassNames.length;
+    document.getElementById('tzModelSelector').disabled = false;
 
     renderTzSections(allCatElems);
     renderTzClassFilter(ifcClassNames);
     tzRenderTable();
 }
+
+window.onTzModelChange = function(modelId) {
+    tzSelectedModelId = modelId || '';
+    tzActiveCategory = '';
+    tzSearchQuery = '';
+    document.getElementById('tzSearchInput').value = '';
+    loadTzElements();
+};
 
 function renderTzSections(allCatElems) {
     // Sidebar sections
@@ -943,7 +1056,7 @@ function tzRenderTable() {
     // When "Все", show a default set
     if (!tzActiveCategory) {
         activeCatCols = [
-            { label: 'Этаж', keys: ['Этаж', 'Storey', 'Level'] },
+            { label: 'Этаж', keys: ['ADSK_Этаж', 'Этаж', 'Storey', 'Level'] },
             { label: 'Система', keys: ['Система', 'System'] },
         ];
     }
@@ -958,7 +1071,7 @@ function tzRenderTable() {
 
     var cols = tzActiveCategory && CATEGORIES.indexOf(tzActiveCategory) >= 0
         ? getColsForCategory(tzActiveCategory) : [
-            { label: 'Этаж', keys: ['Этаж', 'Storey', 'Level'] },
+            { label: 'Этаж', keys: ['ADSK_Этаж', 'Этаж', 'Storey', 'Level'] },
             { label: 'Система', keys: ['Система', 'System'] },
         ];
 
@@ -966,7 +1079,22 @@ function tzRenderTable() {
         var cat = categorizeElement(e);
         var c = CATEGORY_ICONS[cat] || { color: '#6b7280', icon: '?' };
         var propsHtml = cols.map(function(col) {
-            var val = extractProp(e.raw_psets_jsonb, col.keys);
+            var val;
+            if (col.composite) {
+                var parts = [];
+                for (var si = 0; si < col.composite.length; si++) {
+                    for (var di = 0; di < cols.length; di++) {
+                        if (cols[di].label === col.composite[si]) {
+                            var srcVal = extractProp(e.raw_psets_jsonb, cols[di].keys);
+                            if (srcVal !== null && srcVal !== undefined) parts.push(String(srcVal).trim());
+                            break;
+                        }
+                    }
+                }
+                val = parts.length ? parts.join(' ') : null;
+            } else {
+                val = extractProp(e.raw_psets_jsonb, col.keys);
+            }
             var displayVal = formatValue(val);
             var emptyCls = displayVal ? '' : ' empty';
             return '<div class="tz-card-prop"><span class="tz-card-prop-key">' + escHtml(col.label) + ':</span><span class="tz-card-prop-val' + emptyCls + '">' + escHtml(displayVal || '\u2014') + '</span></div>';
@@ -1029,7 +1157,31 @@ async function loadDataCategories() {
         var resp = await fetch(API_BASE + '/projects/' + currentProjectId + '/categories');
         var data = await resp.json();
         dataCategories = (data.categories || []).map(function(c) {
-            return { name: c.name, columns: (c.columns && c.columns.length) ? c.columns : getDefaultCols(c.name) };
+            var cols = (c.columns && c.columns.length > 0) ? c.columns : getDefaultCols(c.name);
+            // Migrate existing saved columns: add group from defaults if missing
+            var defaults = getDefaultCols(c.name);
+            cols = cols.map(function(col) {
+                if (!col.group) {
+                    // Look up group from default by label match
+                    var def = defaults.find(function(d) { return d.label === col.label; });
+                    col.group = def ? def.group : 'structural';
+                }
+                return col;
+            });
+            // Ensure position params exist from defaults
+            defaults.filter(function(d) { return d.group === 'position'; }).forEach(function(def) {
+                var exists = cols.some(function(col) { return col.label === def.label; });
+                if (!exists) {
+                    var newCol = { label: def.label, group: 'position' };
+                    if (def.composite) {
+                        newCol.composite = def.composite.slice();
+                    } else if (def.keys) {
+                        newCol.keys = def.keys.slice();
+                    }
+                    cols.push(newCol);
+                }
+            });
+            return { name: c.name, columns: cols };
         });
     } catch(e) {
         dataCategories = [];
@@ -1038,7 +1190,7 @@ async function loadDataCategories() {
 }
 
 async function countCategoryElements() {
-    // Count elements per category by fetching all project elements
+    // Count elements per category from ALL models (data page shows project-wide stats)
     var counts = {};
     for (var i = 0; i < dataCategories.length; i++) counts[dataCategories[i].name] = 0;
     try {
@@ -1057,7 +1209,6 @@ async function countCategoryElements() {
             }
         }
     } catch(e) {}
-    // Update counts in the rendered list
     var items = document.querySelectorAll('.data-cat-item');
     for (var i = 0; i < items.length; i++) {
         var nameEl = items[i].querySelector('.cat-name');
@@ -1222,14 +1373,40 @@ function renderDataCategories() {
     el.innerHTML = dataCategories.map(function(cat, i) {
         var c = CATEGORY_ICONS[cat.name] || { color: '#6b7280', icon: '?' };
         var cols = cat.columns || [];
-        var colsHtml = cols.map(function(col, ci) {
+        var colsHtml = '';
+        function renderColRow(col, origIdx) {
+            var delBtn = '<span class="data-col-del" onclick="deleteColumn(' + i + ',' + origIdx + ')" title="Удалить параметр">✕</span>';
+            if (col.composite) {
+                var hint = 'составной: ' + col.composite.join(' + ');
+                return '<div class="data-col-row" data-ci="' + origIdx + '">' +
+                    '<input class="data-col-label" value="' + escHtml(col.label) + '" placeholder="Название" />' +
+                    '<span class="data-col-composite-hint">' + escHtml(hint) + '</span>' +
+                    delBtn +
+                '</div>';
+            }
             var keysStr = (col.keys || []).join(', ');
-            return '<div class="data-col-row" data-ci="' + ci + '">' +
+            return '<div class="data-col-row" data-ci="' + origIdx + '">' +
                 '<input class="data-col-label" value="' + escHtml(col.label) + '" placeholder="Название" />' +
                 '<input class="data-col-keys" value="' + escHtml(keysStr) + '" placeholder="ключи через запятую" />' +
-                '<span class="data-col-del" onclick="deleteColumn(' + i + ',' + ci + ')" title="Удалить параметр">✕</span>' +
+                delBtn +
             '</div>';
-        }).join('');
+        }
+        // Position parameters group
+        var posCols = cols.filter(function(col) { return col.group === 'position'; });
+        if (posCols.length) {
+            colsHtml += '<div class="data-col-group-header">Параметры положения</div>';
+            colsHtml += posCols.map(function(col, ci) {
+                return renderColRow(col, cols.indexOf(col));
+            }).join('');
+        }
+        // Structural parameters group
+        var structCols = cols.filter(function(col) { return col.group !== 'position'; });
+        if (structCols.length) {
+            colsHtml += '<div class="data-col-group-header">Структурные параметры</div>';
+            colsHtml += structCols.map(function(col, ci) {
+                return renderColRow(col, cols.indexOf(col));
+            }).join('');
+        }
         var expandId = 'data-cat-expand-' + i;
         return '<div class="data-cat-item" data-index="' + i + '">' +
             '<span class="cat-handle" onclick="toggleCatExpand(\'' + expandId + '\')">▶</span>' +
@@ -1239,11 +1416,6 @@ function renderDataCategories() {
             '<span class="cat-del" onclick="deleteCategory(' + i + ')" title="Удалить">✕</span>' +
         '</div>' +
         '<div class="data-cat-columns" id="' + expandId + '">' +
-            '<div class="data-col-header">' +
-                '<span style="flex:2">Параметр</span>' +
-                '<span style="flex:2">Ключи IFC</span>' +
-                '<span style="width:24px"></span>' +
-            '</div>' +
             colsHtml +
             '<div class="data-col-add" onclick="addColumn(' + i + ')">+ Добавить параметр</div>' +
         '</div>';
@@ -1258,7 +1430,7 @@ window.toggleCatExpand = function(id) {
 window.addColumn = function(catIdx) {
     if (!dataCategories[catIdx]) return;
     if (!dataCategories[catIdx].columns) dataCategories[catIdx].columns = [];
-    dataCategories[catIdx].columns.push({ label: '', keys: [], format: null });
+    dataCategories[catIdx].columns.push({ label: '', keys: [], group: 'structural' });
     renderDataCategories();
     // Auto-open the section
     var expandId = 'data-cat-expand-' + catIdx;
@@ -1330,13 +1502,26 @@ window.saveCategories = async function() {
     // Read columns from UI before saving
     document.querySelectorAll('.data-cat-item').forEach(function(item, idx) {
         var cols = [];
-        item.querySelectorAll('.data-col-row').forEach(function(row) {
-            var label = row.querySelector('.data-col-label').value.trim();
-            var keysStr = row.querySelector('.data-col-keys').value.trim();
-            if (!label) return;
-            var keys = keysStr ? keysStr.split(',').map(function(k) { return k.trim(); }).filter(Boolean) : [label];
-            cols.push({ label: label, keys: keys });
-        });
+        // data-cat-columns is a sibling (not child) of data-cat-item
+        var expandId = 'data-cat-expand-' + idx;
+        var colsEl = document.getElementById(expandId);
+        if (colsEl) {
+            colsEl.querySelectorAll('.data-col-row').forEach(function(row) {
+                var label = row.querySelector('.data-col-label').value.trim();
+                if (!label) return;
+                var ci = parseInt(row.getAttribute('data-ci'));
+                var existing = dataCategories[idx] && dataCategories[idx].columns[ci];
+                var group = existing && existing.group ? existing.group : 'structural';
+                if (existing && existing.composite) {
+                    // Composite column — preserve definition
+                    cols.push({ label: label, composite: existing.composite.slice(), group: group });
+                    return;
+                }
+                var keysStr = row.querySelector('.data-col-keys').value.trim();
+                var keys = keysStr ? keysStr.split(',').map(function(k) { return k.trim(); }).filter(Boolean) : [label];
+                cols.push({ label: label, keys: keys, group: group });
+            });
+        }
         if (dataCategories[idx]) {
             dataCategories[idx].columns = cols;
         }

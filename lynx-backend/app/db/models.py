@@ -54,6 +54,7 @@ class ModelVersion(Base):
     project_id = Column(String, nullable=False)
     ruleset_id = Column(String)
     model_name = Column(String, nullable=False)
+    version_number = Column(Integer, default=None)
     discipline = Column(String, default="VIV")
     status = Column(String, default="uploaded")
     source_filename = Column(String)
@@ -201,6 +202,26 @@ async def init_db():
             for col in tz_cols:
                 if col not in proj_cols:
                     conn.execute(sa.text(f"ALTER TABLE projects ADD COLUMN {col} TEXT"))
+            # Migration: add version_number to model_versions
+            mv_cols = [c["name"] for c in insp.get_columns("model_versions")]
+            if "version_number" not in mv_cols:
+                conn.execute(sa.text("ALTER TABLE model_versions ADD COLUMN version_number INTEGER"))
+            # Backfill version_number for existing NULL models (0,1,2... per project)
+            null_rows = conn.execute(
+                sa.text("SELECT id, project_id, created_at FROM model_versions WHERE version_number IS NULL ORDER BY project_id, created_at")
+            ).fetchall()
+            if null_rows:
+                project_counters = {}
+                for row in null_rows:
+                    pid = row[1]
+                    if pid not in project_counters:
+                        project_counters[pid] = 0
+                    ver = project_counters[pid]
+                    conn.execute(
+                        sa.text("UPDATE model_versions SET version_number = :ver WHERE id = :id"),
+                        {"ver": ver, "id": row[0]}
+                    )
+                    project_counters[pid] = ver + 1
         await conn.run_sync(_migrate)
 
 
@@ -212,10 +233,23 @@ async def create_model_version(
     filename: str,
 ) -> ModelVersion:
     async with async_session() as session:
+        from sqlalchemy import select, func
+        # Determine next version number for this project (0-based)
+        ver_result = await session.execute(
+            select(func.max(ModelVersion.version_number))
+            .where(ModelVersion.project_id == project_id)
+        )
+        max_ver = ver_result.scalar()
+        if max_ver is None:
+            next_ver = 0
+        else:
+            next_ver = max_ver + 1
+
         mv = ModelVersion(
             id=model_version_id,
             project_id=project_id,
             model_name=model_name,
+            version_number=next_ver,
             ruleset_id=ruleset_id,
             source_filename=filename,
             status="queued",
@@ -227,6 +261,7 @@ async def create_model_version(
             "id": mv.id,
             "project_id": mv.project_id,
             "model_name": mv.model_name,
+            "version_number": mv.version_number,
             "status": mv.status,
         }
 
@@ -448,6 +483,7 @@ async def list_all_models(project_id: Optional[str] = None) -> list:
                 "id": m.id,
                 "project_id": m.project_id,
                 "model_name": m.model_name,
+                "version_number": m.version_number,
                 "status": m.status,
                 "created_at": m.created_at.isoformat() if m.created_at else None,
                 "processed_at": m.processed_at.isoformat() if m.processed_at else None,
@@ -491,70 +527,111 @@ DEFAULT_CATEGORIES = [
 
 DEFAULT_COLUMNS = {
     "Труба металлическая": [
-        {"label": "Секция", "keys": ["Секция", "Section"], "format": None},
-        {"label": "Часть системы", "keys": ["Часть системы", "SystemPart", "PartOfSystem"], "format": None},
-        {"label": "Этаж", "keys": ["Этаж", "Storey", "Level"], "format": None},
-        {"label": "Вид", "keys": ["Вид", "Type", "PipeType"], "format": None},
-        {"label": "Размер", "keys": ["Размер", "Size", "DN", "NominalDiameter"], "format": None},
-        {"label": "Толщина стенки", "keys": ["Толщина стенки", "WallThickness"], "format": {"decimals": 2}},
-        {"label": "Длина, мм", "keys": ["Длина", "Length"], "format": {"decimals": 1}},
-        {"label": "Стадия", "keys": ["Стадия проектирования", "DesignStage"], "format": None},
+        {"label": "Секция", "keys": ["ADSK_Номер секции", "Секция", "Section"], "group": "position", "format": None},
+        {"label": "Часть системы", "keys": ["BRU_ЧастьСистемы"], "group": "position", "format": None},
+        {"label": "Система", "keys": ["BRU_Система"], "group": "position", "format": None},
+        {"label": "Этаж", "keys": ["ADSK_Этаж", "Этаж", "Storey", "Level"], "group": "position", "format": None},
+        {"label": "CUBE_Сокращение", "keys": ["CUBE_Сокращение"], "group": "position", "format": None},
+        {"label": "Вид", "keys": ["Вид", "Type", "PipeType"], "group": "structural", "format": None},
+        {"label": "Размер", "keys": ["Размер", "Size", "DN", "NominalDiameter"], "group": "structural", "format": None},
+        {"label": "Толщина стенки", "keys": ["Толщина стенки", "WallThickness"], "group": "structural", "format": {"decimals": 2}},
+        {"label": "Длина, мм", "keys": ["Длина", "Length"], "group": "structural", "format": {"decimals": 1}},
     ],
     "Труба полимерная": [
-        {"label": "Секция", "keys": ["Секция", "Section"], "format": None},
-        {"label": "Часть системы", "keys": ["Часть системы", "SystemPart", "PartOfSystem"], "format": None},
-        {"label": "Вид", "keys": ["Вид", "Type", "PipeType"], "format": None},
-        {"label": "Размер", "keys": ["Размер", "Size", "DN", "NominalDiameter"], "format": None},
-        {"label": "Толщина стенки", "keys": ["Толщина стенки", "WallThickness"], "format": {"decimals": 2}},
-        {"label": "Длина, мм", "keys": ["Длина", "Length"], "format": {"decimals": 1}},
+        {"label": "Секция", "keys": ["ADSK_Номер секции", "Секция", "Section"], "group": "position", "format": None},
+        {"label": "Часть системы", "keys": ["BRU_ЧастьСистемы"], "group": "position", "format": None},
+        {"label": "Система", "keys": ["BRU_Система"], "group": "position", "format": None},
+        {"label": "Этаж", "keys": ["ADSK_Этаж", "Этаж", "Storey", "Level"], "group": "position", "format": None},
+        {"label": "CUBE_Сокращение", "keys": ["CUBE_Сокращение"], "group": "position", "format": None},
+        {"label": "Вид", "keys": ["Вид", "Type", "PipeType"], "group": "structural", "format": None},
+        {"label": "Размер", "keys": ["Размер", "Size", "DN", "NominalDiameter"], "group": "structural", "format": None},
+        {"label": "Толщина стенки", "keys": ["Толщина стенки", "WallThickness"], "group": "structural", "format": {"decimals": 2}},
+        {"label": "Длина, мм", "keys": ["Длина", "Length"], "group": "structural", "format": {"decimals": 1}},
     ],
     "Металлическая соединительная деталь трубы": [
-        {"label": "Секция", "keys": ["Секция", "Section"], "format": None},
-        {"label": "Часть системы", "keys": ["Часть системы", "SystemPart", "PartOfSystem"], "format": None},
-        {"label": "Вид", "keys": ["Вид", "Type", "FittingType"], "format": None},
-        {"label": "Размер", "keys": ["Размер", "Size", "DN", "NominalDiameter"], "format": None},
+        {"label": "Секция", "keys": ["ADSK_Номер секции", "Секция", "Section"], "group": "position", "format": None},
+        {"label": "Часть системы", "keys": ["BRU_ЧастьСистемы"], "group": "position", "format": None},
+        {"label": "Система", "keys": ["BRU_Система"], "group": "position", "format": None},
+        {"label": "Этаж", "keys": ["ADSK_Этаж", "Этаж", "Storey", "Level"], "group": "position", "format": None},
+        {"label": "CUBE_Сокращение", "keys": ["CUBE_Сокращение"], "group": "position", "format": None},
+        {"label": "Тип", "keys": ["BRU_Тип", "Bru_Тип", "Тип", "Type"], "group": "structural", "format": None},
+        {"label": "Вид", "keys": ["BRU_Вид", "Bru_Вид", "Вид", "Type", "FittingType", "ValveType"], "group": "structural", "format": None},
+        {"label": "Размер", "keys": ["BRU_Габарит элемента", "Bru_Габарит элемента", "Размер", "Size", "DN", "NominalDiameter"], "group": "structural", "format": None},
+        {"label": "Материал", "keys": ["Материал", "Material"], "group": "structural", "format": None},
     ],
     "Полимерная соединительная деталь трубы": [
-        {"label": "Секция", "keys": ["Секция", "Section"], "format": None},
-        {"label": "Часть системы", "keys": ["Часть системы", "SystemPart", "PartOfSystem"], "format": None},
-        {"label": "Вид", "keys": ["Вид", "Type", "FittingType"], "format": None},
-        {"label": "Размер", "keys": ["Размер", "Size", "DN", "NominalDiameter"], "format": None},
+        {"label": "Секция", "keys": ["ADSK_Номер секции", "Секция", "Section"], "group": "position", "format": None},
+        {"label": "Часть системы", "keys": ["BRU_ЧастьСистемы"], "group": "position", "format": None},
+        {"label": "Система", "keys": ["BRU_Система"], "group": "position", "format": None},
+        {"label": "Этаж", "keys": ["ADSK_Этаж", "Этаж", "Storey", "Level"], "group": "position", "format": None},
+        {"label": "CUBE_Сокращение", "keys": ["CUBE_Сокращение"], "group": "position", "format": None},
+        {"label": "Тип", "keys": ["BRU_Тип", "Bru_Тип", "Тип", "Type"], "group": "structural", "format": None},
+        {"label": "Вид", "keys": ["BRU_Вид", "Bru_Вид", "Вид", "Type", "FittingType", "ValveType"], "group": "structural", "format": None},
+        {"label": "Размер", "keys": ["BRU_Габарит элемента", "Bru_Габарит элемента", "Размер", "Size", "DN", "NominalDiameter"], "group": "structural", "format": None},
+        {"label": "Материал", "keys": ["Материал", "Material"], "group": "structural", "format": None},
     ],
     "Арматура труб": [
-        {"label": "Секция", "keys": ["Секция", "Section"], "format": None},
-        {"label": "Часть системы", "keys": ["Часть системы", "SystemPart", "PartOfSystem"], "format": None},
-        {"label": "Вид", "keys": ["Вид", "Type", "ValveType"], "format": None},
-        {"label": "Размер", "keys": ["Размер", "Size", "DN", "NominalDiameter"], "format": None},
-        {"label": "Материал", "keys": ["Материал", "Material"], "format": None},
+        {"label": "Секция", "keys": ["ADSK_Номер секции", "Секция", "Section"], "group": "position", "format": None},
+        {"label": "Часть системы", "keys": ["BRU_ЧастьСистемы"], "group": "position", "format": None},
+        {"label": "Система", "keys": ["BRU_Система"], "group": "position", "format": None},
+        {"label": "Этаж", "keys": ["ADSK_Этаж", "Этаж", "Storey", "Level"], "group": "position", "format": None},
+        {"label": "CUBE_Сокращение", "keys": ["CUBE_Сокращение"], "group": "position", "format": None},
+        {"label": "Тип", "keys": ["BRU_Тип", "Bru_Тип", "Тип", "Type"], "group": "structural", "format": None},
+        {"label": "Вид", "keys": ["BRU_Вид", "Bru_Вид", "Вид", "Type", "ValveType"], "group": "structural", "format": None},
+        {"label": "Размер", "keys": ["BRU_Габарит элемента", "Bru_Габарит элемента", "Размер", "Size", "DN", "NominalDiameter"], "group": "structural", "format": None},
+        {"label": "Материал", "keys": ["Материал", "Material"], "group": "structural", "format": None},
     ],
     "Арматура": [
-        {"label": "Секция", "keys": ["Секция", "Section"], "format": None},
-        {"label": "Часть системы", "keys": ["Часть системы", "SystemPart", "PartOfSystem"], "format": None},
-        {"label": "Вид", "keys": ["Вид", "Type", "ValveType"], "format": None},
-        {"label": "Размер", "keys": ["Размер", "Size", "DN", "NominalDiameter"], "format": None},
-        {"label": "Материал", "keys": ["Материал", "Material"], "format": None},
+        {"label": "Секция", "keys": ["ADSK_Номер секции", "Секция", "Section"], "group": "position", "format": None},
+        {"label": "Часть системы", "keys": ["BRU_ЧастьСистемы"], "group": "position", "format": None},
+        {"label": "Система", "keys": ["BRU_Система"], "group": "position", "format": None},
+        {"label": "Этаж", "keys": ["ADSK_Этаж", "Этаж", "Storey", "Level"], "group": "position", "format": None},
+        {"label": "CUBE_Сокращение", "keys": ["CUBE_Сокращение"], "group": "position", "format": None},
+        {"label": "Тип", "keys": ["BRU_Тип", "Bru_Тип", "Тип", "Type"], "group": "structural", "format": None},
+        {"label": "Вид", "keys": ["BRU_Вид", "Bru_Вид", "Вид", "Type", "ValveType"], "group": "structural", "format": None},
+        {"label": "Размер", "keys": ["BRU_Габарит элемента", "Bru_Габарит элемента", "Размер", "Size", "DN", "NominalDiameter"], "group": "structural", "format": None},
+        {"label": "Материал", "keys": ["Материал", "Material"], "group": "structural", "format": None},
     ],
     "Оборудование": [
-        {"label": "Секция", "keys": ["Секция", "Section"], "format": None},
-        {"label": "Часть системы", "keys": ["Часть системы", "SystemPart", "PartOfSystem", "System"], "format": None},
-        {"label": "Тип", "keys": ["Тип", "EquipmentType", "Type"], "format": None},
-        {"label": "Мощность", "keys": ["Мощность", "Power", "PowerConsumption"], "format": {"decimals": 1}},
-        {"label": "Производительность", "keys": ["Производительность", "Performance", "FlowRate"], "format": {"decimals": 1}},
+        {"label": "Секция", "keys": ["ADSK_Номер секции", "Секция", "Section"], "group": "position", "format": None},
+        {"label": "Часть системы", "keys": ["BRU_ЧастьСистемы"], "group": "position", "format": None},
+        {"label": "Система", "keys": ["BRU_Система"], "group": "position", "format": None},
+        {"label": "Этаж", "keys": ["ADSK_Этаж", "Этаж", "Storey", "Level"], "group": "position", "format": None},
+        {"label": "CUBE_Сокращение", "keys": ["CUBE_Сокращение"], "group": "position", "format": None},
+        {"label": "Тип", "keys": ["BRU_Тип", "Bru_Тип", "Тип", "EquipmentType", "Type"], "group": "structural", "format": None},
+        {"label": "Вид", "keys": ["BRU_Вид", "Bru_Вид", "Вид", "Type"], "group": "structural", "format": None},
+        {"label": "Размер", "keys": ["BRU_Габарит элемента", "Bru_Габарит элемента", "Размер", "Size", "DN"], "group": "structural", "format": None},
+        {"label": "Мощность", "keys": ["Мощность", "Power", "PowerConsumption"], "group": "structural", "format": {"decimals": 1}},
+        {"label": "Производительность", "keys": ["Производительность", "Performance", "FlowRate"], "group": "structural", "format": {"decimals": 1}},
     ],
     "Сантехнический прибор": [
-        {"label": "Секция", "keys": ["Секция", "Section"], "format": None},
-        {"label": "Вид", "keys": ["Вид", "Type", "FixtureType"], "format": None},
-        {"label": "Подключение", "keys": ["Подключение", "Connection", "ConnectionType"], "format": None},
+        {"label": "Секция", "keys": ["ADSK_Номер секции", "Секция", "Section"], "group": "position", "format": None},
+        {"label": "Часть системы", "keys": ["BRU_ЧастьСистемы"], "group": "position", "format": None},
+        {"label": "Система", "keys": ["BRU_Система"], "group": "position", "format": None},
+        {"label": "Этаж", "keys": ["ADSK_Этаж", "Этаж", "Storey", "Level"], "group": "position", "format": None},
+        {"label": "CUBE_Сокращение", "keys": ["CUBE_Сокращение"], "group": "position", "format": None},
+        {"label": "Вид", "keys": ["BRU_Вид", "Bru_Вид", "Вид", "Type", "FixtureType"], "group": "structural", "format": None},
+        {"label": "Подключение", "keys": ["Подключение", "Connection", "ConnectionType"], "group": "structural", "format": None},
     ],
     "Изоляция рулонная": [
-        {"label": "Толщина", "keys": ["Толщина", "Thickness"], "format": {"decimals": 2}},
-        {"label": "Материал", "keys": ["Материал", "Material"], "format": None},
-        {"label": "Тип", "keys": ["Тип", "Type", "InsulationType"], "format": None},
+        {"label": "Секция", "keys": ["ADSK_Номер секции", "Секция", "Section"], "group": "position", "format": None},
+        {"label": "Часть системы", "keys": ["BRU_ЧастьСистемы"], "group": "position", "format": None},
+        {"label": "Система", "keys": ["BRU_Система"], "group": "position", "format": None},
+        {"label": "Этаж", "keys": ["ADSK_Этаж", "Этаж", "Storey", "Level"], "group": "position", "format": None},
+        {"label": "CUBE_Сокращение", "keys": ["CUBE_Сокращение"], "group": "position", "format": None},
+        {"label": "Толщина", "keys": ["Толщина", "Thickness"], "group": "structural", "format": {"decimals": 2}},
+        {"label": "Материал", "keys": ["Материал", "Material"], "group": "structural", "format": None},
+        {"label": "Тип", "keys": ["BRU_Тип", "Bru_Тип", "Тип", "Type", "InsulationType"], "group": "structural", "format": None},
     ],
     "Изоляция трубчатая": [
-        {"label": "Толщина", "keys": ["Толщина", "Thickness"], "format": {"decimals": 2}},
-        {"label": "Материал", "keys": ["Материал", "Material"], "format": None},
-        {"label": "Тип", "keys": ["Тип", "Type", "InsulationType"], "format": None},
+        {"label": "Секция", "keys": ["ADSK_Номер секции", "Секция", "Section"], "group": "position", "format": None},
+        {"label": "Часть системы", "keys": ["BRU_ЧастьСистемы"], "group": "position", "format": None},
+        {"label": "Система", "keys": ["BRU_Система"], "group": "position", "format": None},
+        {"label": "Этаж", "keys": ["ADSK_Этаж", "Этаж", "Storey", "Level"], "group": "position", "format": None},
+        {"label": "CUBE_Сокращение", "keys": ["CUBE_Сокращение"], "group": "position", "format": None},
+        {"label": "Толщина", "keys": ["Толщина", "Thickness"], "group": "structural", "format": {"decimals": 2}},
+        {"label": "Материал", "keys": ["Материал", "Material"], "group": "structural", "format": None},
+        {"label": "Тип", "keys": ["BRU_Тип", "Bru_Тип", "Тип", "Type", "InsulationType"], "group": "structural", "format": None},
     ],
     "Невалидируемое семейство": [],
 }
@@ -574,11 +651,43 @@ async def list_project_categories(project_id: str) -> list:
                 {"name": name, "order": i, "columns": DEFAULT_COLUMNS.get(name, [])}
                 for i, name in enumerate(DEFAULT_CATEGORIES)
             ]
+
+        def _merge_defaults(saved_cols: list, cat_name: str) -> list:
+            """Add group field and missing default columns to saved config."""
+            defaults = DEFAULT_COLUMNS.get(cat_name, [])
+            merged = []
+            for col in saved_cols:
+                if "group" not in col or not col.get("group"):
+                    # Look up group from default by label
+                    default_group = "structural"
+                    for d in defaults:
+                        if d["label"] == col.get("label"):
+                            default_group = d.get("group", "structural")
+                            break
+                    col["group"] = default_group
+                merged.append(col)
+            # Add missing position/structural params from defaults
+            existing_labels = {c.get("label") for c in merged}
+            for d in defaults:
+                if d["label"] not in existing_labels:
+                    new_col = {
+                        "label": d["label"],
+                        "group": d.get("group", "structural"),
+                    }
+                    if "composite" in d:
+                        new_col["composite"] = list(d["composite"])
+                    else:
+                        new_col["keys"] = list(d.get("keys", []))
+                    if "format" in d:
+                        new_col["format"] = d["format"]
+                    merged.append(new_col)
+            return merged
+
         return [
             {
                 "name": c.name,
                 "order": c.display_order,
-                "columns": c.columns_config if c.columns_config else DEFAULT_COLUMNS.get(c.name, []),
+                "columns": _merge_defaults(c.columns_config, c.name) if c.columns_config is not None else DEFAULT_COLUMNS.get(c.name, []),
             }
             for c in cats
         ]

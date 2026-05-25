@@ -9,6 +9,7 @@ namespace LynxRevitPlugin
         private TextBox serverUrlTextBox;
         private TextBox projectIdTextBox;
         private TextBox rulesetIdTextBox;
+        private TextBox lynxUrlTextBox;
         private Button saveButton;
         private Button cancelButton;
 
@@ -17,6 +18,7 @@ namespace LynxRevitPlugin
         public string ServerUrl { get; private set; }
         public string ProjectId { get; private set; }
         public string RulesetId { get; private set; }
+        public string LynxUrl { get; private set; }
 
         public SettingsForm()
         {
@@ -27,34 +29,54 @@ namespace LynxRevitPlugin
         private void InitializeComponent()
         {
             this.Text = "Настройки Lynx";
-            this.Width = 450;
-            this.Height = 250;
+            this.Width = 460;
+            this.Height = 320;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.StartPosition = FormStartPosition.CenterParent;
 
             var serverUrlLabel = new Label { Text = "URL сервера:", Left = 20, Top = 20, Width = 100 };
-            serverUrlTextBox = new TextBox { Left = 130, Top = 17, Width = 280 };
+            serverUrlTextBox = new TextBox { Left = 130, Top = 17, Width = 290 };
             serverUrlTextBox.Text = "http://localhost:8000";
 
             var projectIdLabel = new Label { Text = "Project ID:", Left = 20, Top = 60, Width = 100 };
-            projectIdTextBox = new TextBox { Left = 130, Top = 57, Width = 280 };
+            projectIdTextBox = new TextBox { Left = 130, Top = 57, Width = 290 };
             projectIdTextBox.Text = "default";
 
             var rulesetIdLabel = new Label { Text = "Ruleset ID:", Left = 20, Top = 100, Width = 100 };
-            rulesetIdTextBox = new TextBox { Left = 130, Top = 97, Width = 280 };
+            rulesetIdTextBox = new TextBox { Left = 130, Top = 97, Width = 290 };
             rulesetIdTextBox.Text = "default";
 
-            saveButton = new Button { Text = "Сохранить", Left = 250, Top = 150, Width = 80 };
+            var lynxUrlLabel = new Label { Text = "Lynx URL:", Left = 20, Top = 140, Width = 100 };
+            lynxUrlTextBox = new TextBox { Left = 130, Top = 137, Width = 290 };
+            lynxUrlTextBox.Text = "http://localhost:5173";
+
+            var openLynxBtn = new Button { Text = "Открыть в браузере", Left = 130, Top = 167, Width = 150 };
+            openLynxBtn.Click += (s, e) =>
+            {
+                var url = lynxUrlTextBox.Text.Trim();
+                if (!string.IsNullOrEmpty(url))
+                {
+                    try
+                    {
+                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
+                    }
+                    catch { }
+                }
+            };
+
+            saveButton = new Button { Text = "Сохранить", Left = 250, Top = 230, Width = 85 };
             saveButton.Click += SaveButton_Click;
 
-            cancelButton = new Button { Text = "Отмена", Left = 340, Top = 150, Width = 80 };
+            cancelButton = new Button { Text = "Отмена", Left = 345, Top = 230, Width = 85 };
             cancelButton.Click += (s, e) => { this.DialogResult = DialogResult.Cancel; this.Close(); };
 
             this.Controls.AddRange(new Control[] {
                 serverUrlLabel, serverUrlTextBox,
                 projectIdLabel, projectIdTextBox,
                 rulesetIdLabel, rulesetIdTextBox,
+                lynxUrlLabel, lynxUrlTextBox,
+                openLynxBtn,
                 saveButton, cancelButton
             });
         }
@@ -77,6 +99,7 @@ namespace LynxRevitPlugin
                                 case "ServerUrl": serverUrlTextBox.Text = parts[1]; break;
                                 case "ProjectId": projectIdTextBox.Text = parts[1]; break;
                                 case "RulesetId": rulesetIdTextBox.Text = parts[1]; break;
+                                case "LynxUrl": lynxUrlTextBox.Text = parts[1]; break;
                             }
                         }
                     }
@@ -87,9 +110,10 @@ namespace LynxRevitPlugin
 
         private void SaveButton_Click(object sender, EventArgs e)
         {
-            ServerUrl = serverUrlTextBox.Text;
-            ProjectId = projectIdTextBox.Text;
-            RulesetId = rulesetIdTextBox.Text;
+            ServerUrl = serverUrlTextBox.Text.Trim();
+            ProjectId = projectIdTextBox.Text.Trim();
+            RulesetId = rulesetIdTextBox.Text.Trim();
+            LynxUrl = lynxUrlTextBox.Text.Trim();
 
             SaveSettings();
             this.DialogResult = DialogResult.OK;
@@ -108,7 +132,8 @@ namespace LynxRevitPlugin
                 var lines = new string[] {
                     $"ServerUrl={ServerUrl}",
                     $"ProjectId={ProjectId}",
-                    $"RulesetId={RulesetId}"
+                    $"RulesetId={RulesetId}",
+                    $"LynxUrl={LynxUrl}"
                 };
                 File.WriteAllLines(configPath, lines);
             }
@@ -133,7 +158,8 @@ namespace LynxRevitPlugin
                 {
                     ServerUrl = "http://localhost:8000",
                     ProjectId = "default",
-                    RulesetId = "default"
+                    RulesetId = "default",
+                    LynxUrl = "http://localhost:5173"
                 };
             }
 
@@ -146,12 +172,13 @@ namespace LynxRevitPlugin
                     var parts = line.Split('=');
                     if (parts.Length == 2)
                     {
-                        switch (parts[0])
-                        {
-                            case "ServerUrl": data.ServerUrl = parts[1]; break;
-                            case "ProjectId": data.ProjectId = parts[1]; break;
-                            case "RulesetId": data.RulesetId = parts[1]; break;
-                        }
+                    switch (parts[0])
+                    {
+                        case "ServerUrl": data.ServerUrl = parts[1]; break;
+                        case "ProjectId": data.ProjectId = parts[1]; break;
+                        case "RulesetId": data.RulesetId = parts[1]; break;
+                        case "LynxUrl": data.LynxUrl = parts[1]; break;
+                    }
                     }
                 }
                 return data;
@@ -162,7 +189,8 @@ namespace LynxRevitPlugin
                 {
                     ServerUrl = "http://localhost:8000",
                     ProjectId = "default",
-                    RulesetId = "default"
+                    RulesetId = "default",
+                    LynxUrl = "http://localhost:5173"
                 };
             }
         }
@@ -173,5 +201,6 @@ namespace LynxRevitPlugin
         public string ServerUrl { get; set; }
         public string ProjectId { get; set; }
         public string RulesetId { get; set; }
+        public string LynxUrl { get; set; }
     }
 }

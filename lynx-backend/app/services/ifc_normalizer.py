@@ -26,6 +26,8 @@ def extract_diameter_from_psets(psets: dict) -> Optional[float]:
         "Diameter",
         "Size",
         "DN",
+        "BRU_Габарит элемента",
+        "Bru_Габарит элемента",
     ]
     
     for pset_name, pset_data in psets.items():
@@ -53,13 +55,27 @@ def normalize_element(e, model, scale_to_mm: float = 1000.0) -> dict:
         diameter_mm = diameter_val * scale_to_mm
     
     storey = None
+    # 1. Try spatial containment (standard IFC way)
     try:
         if hasattr(e, "ContainedInSpatialStructure") and e.ContainedInSpatialStructure:
-            storey = e.ContainedInSpatialStructure
-            if hasattr(storey, "Name"):
-                storey = storey.Name
+            rels = e.ContainedInSpatialStructure
+            if len(rels) > 0:
+                rel = rels[0] if isinstance(rels, (list, tuple)) else rels
+                if hasattr(rel, "RelatingStructure") and rel.RelatingStructure:
+                    storey = rel.RelatingStructure.Name
     except:
         pass
+    # 2. Fallback to ADSK_Этаж and common keys from psets
+    if not storey and psets:
+        for pset_name, props in psets.items():
+            if isinstance(props, dict):
+                for key in ["ADSK_Этаж", "Этаж", "Storey", "Level"]:
+                    val = props.get(key)
+                    if val and str(val).strip():
+                        storey = str(val).strip()
+                        break
+            if storey:
+                break
     
     system = None
     try:

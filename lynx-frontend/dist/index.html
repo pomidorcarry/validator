@@ -118,6 +118,15 @@
         .issue-badge.warning { background: #d4993a18; color: var(--warning); }
         .issue-key { font-size: 12px; color: var(--text-secondary); }
         .issue-message { font-size: 13px; }
+        .issue-element-id { font-size: 10px; color: var(--text-secondary); margin-top: 2px; opacity: 0.5; }
+        .issue-group { margin-bottom: 8px; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+        .issue-group-header { display: flex; align-items: center; gap: 8px; padding: 8px 12px; cursor: pointer; background: var(--bg); user-select: none; }
+        .issue-group-header:hover { background: var(--panel); }
+        .issue-group-toggle { font-size: 10px; color: var(--text-secondary); width: 12px; text-align: center; flex-shrink: 0; transition: transform 0.15s; }
+        .issue-group-count { margin-left: auto; font-size: 11px; color: var(--text-secondary); background: var(--panel); padding: 1px 8px; border-radius: 10px; }
+        .issue-group-items { }
+        .issue-group-items.collapsed { display: none; }
+        .issue-group-items .issue-item { margin: 0; border-radius: 0; border: none; border-top: 1px solid var(--border); }
         
         /* ── Modal ── */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(20,18,16,0.7); z-index: 1000; justify-content: center; align-items: center; }
@@ -192,6 +201,11 @@
         .data-col-row input { padding: 5px 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: 12px; flex: 2; }
         .data-col-row input:focus { outline: none; border-color: var(--accent); }
 
+        .data-col-composite-hint { flex: 2; padding: 5px 8px; font-size: 11px; color: var(--text-secondary); font-style: italic; opacity: 0.7; display: flex; align-items: center; }
+
+        .data-col-group-header { display: flex; gap: 8px; align-items: center; font-size: 11px; color: var(--accent); font-weight: 600; text-transform: uppercase; padding: 8px 0 4px; letter-spacing: 0.5px; }
+        .data-col-group-header:first-of-type { padding-top: 4px; }
+
         .data-col-del { cursor: pointer; color: var(--text-secondary); font-size: 14px; opacity: 0.4; width: 24px; text-align: center; }
         .data-col-del:hover { opacity: 1; color: var(--error); }
         .data-col-add { cursor: pointer; font-size: 12px; color: var(--accent); padding: 6px 0; opacity: 0.7; }
@@ -251,7 +265,7 @@
         .tz-history-source { padding: 1px 6px; border-radius: 4px; font-size: 11px; background: var(--bg); border: 1px solid var(--border); }
 
     </style>
-  <script type="module" crossorigin src="/assets/index-1yxmNFEZ.js"></script>
+  <script type="module" crossorigin src="/assets/index-xr5tZpLH.js"></script>
 </head>
 <body>
     <div class="header">
@@ -367,6 +381,10 @@
                             <div class="tz-toolbar-title" id="tzPageTitle">Элементы</div>
                             <div class="tz-toolbar-meta" id="tzPageMeta">Загрузка...</div>
                         </div>
+                        <span style="flex:1"></span>
+                        <select id="tzModelSelector" onchange="onTzModelChange(this.value)" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 10px;font-size:13px;max-width:280px">
+                            <option value="">— Все модели —</option>
+                        </select>
                     </div>
                     <div class="tz-search">
                         <div class="tz-search-wrap">

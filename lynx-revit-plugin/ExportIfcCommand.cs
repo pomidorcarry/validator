@@ -41,36 +41,66 @@ namespace LynxRevitPlugin
                 return Result.Failed;
             }
 
+            ProgressFormHandle formHandle = null;
+
             try
             {
-                TaskDialog.Show("Lynx", "Экспорт IFC начат.\nЭто окно можно закрыть.");
+                formHandle = new ProgressFormHandle();
+                formHandle.Show();
 
                 string exportFolder = GetExportFolder();
                 string ifcFileName = $"{doc.Title}_{DateTime.Now:yyyyMMdd_HHmmss}.ifc";
                 string ifcPath = Path.Combine(exportFolder, ifcFileName);
 
-                ExportIfc(doc, exportFolder, ifcFileName);
+                formHandle.SetStatus("Экспорт IFC...");
+                formHandle.SetProgress(5);
+
+                using (Transaction t = new Transaction(doc, "IFC Export"))
+                {
+                    t.Start();
+                    ExportIfc(doc, exportFolder, ifcFileName);
+                    t.Commit();
+                }
+
+                formHandle.SetStatus("Экспорт завершён");
+                formHandle.SetProgress(50);
+
+                var docData = new DocumentData
+                {
+                    Title = doc.Title,
+                    RevitVersion = doc.Application.VersionNumber,
+                    SourceFileName = doc.PathName ?? ""
+                };
 
                 _isUploading = true;
+
+                var capturedHandle = formHandle;
+                var capturedIfcPath = ifcPath;
+                var lynxUrl = settings.LynxUrl;
 
                 Task.Run(async () =>
                 {
                     try
                     {
-                        var result = await UploadIfcToServerAsync(ifcPath, settings, doc);
-                        var evt = new ShowUploadResultEvent();
+                        capturedHandle.SetStatus("Отправка на сервер...");
+                        var result = await UploadIfcToServerAsync(capturedIfcPath, settings, docData, capturedHandle);
                         if (result.Success)
                         {
-                            evt.Message =
-                                $"Модель отправлена.\n\n" +
-                                $"Model ID: {result.ModelVersionId}\n" +
-                                $"Status: {result.Status}";
+                            capturedHandle.SetCompleted(true, "Модель отправлена");
+
+                            if (!string.IsNullOrEmpty(lynxUrl))
+                            {
+                                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(lynxUrl) { UseShellExecute = true });
+                            }
                         }
                         else
                         {
-                            evt.Message = $"Ошибка: {result.ErrorMessage}";
+                            capturedHandle.SetCompleted(false, $"Ошибка: {result.ErrorMessage}");
                         }
-                        ExternalEvent.Create(evt).Raise();
+                    }
+                    catch (Exception ex)
+                    {
+                        capturedHandle.SetCompleted(false, ex.Message);
                     }
                     finally
                     {
@@ -83,7 +113,14 @@ namespace LynxRevitPlugin
             catch (Exception ex)
             {
                 _isUploading = false;
-                TaskDialog.Show("Lynx", $"Ошибка: {ex.Message}");
+                if (formHandle != null && !formHandle.IsCompleted)
+                {
+                    formHandle.SetCompleted(false, ex.Message);
+                }
+                else
+                {
+                    TaskDialog.Show("Lynx", $"Ошибка: {ex.Message}");
+                }
                 message = ex.Message;
                 return Result.Failed;
             }
@@ -123,29 +160,37 @@ namespace LynxRevitPlugin
             }
         }
 
-        private async Task<UploadResult> UploadIfcToServerAsync(string ifcPath, SettingsData settings, Document doc)
+        private async Task<UploadResult> UploadIfcToServerAsync(string ifcPath, SettingsData settings, DocumentData docData, ProgressFormHandle progressHandle)
         {
             using (var client = new HttpClient())
             {
                 client.Timeout = TimeSpan.FromMinutes(10);
 
-                using (var form = new MultipartFormDataContent())
+                using (var multipart = new MultipartFormDataContent())
                 {
-                    form.Add(new StringContent(settings.ProjectId), "project_id");
-                    form.Add(new StringContent(doc.Title), "model_name");
-                    form.Add(new StringContent(settings.RulesetId), "ruleset_id");
-                    form.Add(new StringContent("VIV"), "discipline");
-                    form.Add(new StringContent(doc.Application.VersionNumber), "revit_version");
-                    form.Add(new StringContent("0.1.0"), "plugin_version");
-                    form.Add(new StringContent(doc.PathName ?? ""), "source_file_name");
+                    multipart.Add(new StringContent(settings.ProjectId), "project_id");
+                    multipart.Add(new StringContent(docData.Title), "model_name");
+                    multipart.Add(new StringContent(settings.RulesetId), "ruleset_id");
+                    multipart.Add(new StringContent("VIV"), "discipline");
+                    multipart.Add(new StringContent(docData.RevitVersion), "revit_version");
+                    multipart.Add(new StringContent("0.1.0"), "plugin_version");
+                    multipart.Add(new StringContent(docData.SourceFileName), "source_file_name");
 
-                    var fileStream = File.OpenRead(ifcPath);
-                    using (var fileContent = new StreamContent(fileStream))
+                    var fileInfo = new FileInfo(ifcPath);
+                    var progressStream = new ProgressFileStream(ifcPath, (sent, total) =>
+                    {
+                        int pct = (int)(50 + (sent * 50.0 / total));
+                        progressHandle.SetProgress(pct);
+                    });
+
+                    using (var fileContent = new StreamContent(progressStream))
                     {
                         fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
-                        form.Add(fileContent, "file", Path.GetFileName(ifcPath));
+                        multipart.Add(fileContent, "file", Path.GetFileName(ifcPath));
 
-                        var response = await client.PostAsync($"{settings.ServerUrl}/api/v1/models/upload", form);
+                        var response = await client.PostAsync($"{settings.ServerUrl}/api/v1/models/upload", multipart);
+
+                        progressHandle.SetProgress(100);
 
                         if (response.IsSuccessStatusCode)
                         {
@@ -181,15 +226,10 @@ namespace LynxRevitPlugin
         public string ErrorMessage { get; set; }
     }
 
-    public class ShowUploadResultEvent : IExternalEventHandler
+    public class DocumentData
     {
-        public string Message { get; set; }
-
-        public void Execute(UIApplication app)
-        {
-            TaskDialog.Show("Lynx", Message);
-        }
-
-        public string GetName() => "Lynx Upload Result";
+        public string Title { get; set; }
+        public string RevitVersion { get; set; }
+        public string SourceFileName { get; set; }
     }
 }
