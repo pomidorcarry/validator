@@ -1,99 +1,615 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>LYNX</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='28' font-size='28'%3E⬡%3C/text%3E%3C/svg%3E">
+    <title>LYNX — BIM Validation</title>
     <style>
         :root {
-            --bg: #0d0d0d;
-            --panel: #141414;
-            --border: #2a2a2a;
-            --text: #e0e0e0;
-            --text-secondary: #888;
-            --accent: #10b981;
+            --bg: #0b0914;
+            --bg-body: radial-gradient(ellipse at 50% 0%, #1e1233 0%, #0b0914 70%);
+            --panel: #121018;
+            --border: #2a2030;
+            --text: #e0dce8;
+            --text-secondary: #8880a0;
+            --accent: #8b5cf6;
             --error: #ff6b6b;
             --warning: #ffb74d;
+            --accent-light: #8b5cf618;
+            --accent-hover: #7c3aed;
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); }
+        body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg-body, var(--bg)); color: var(--text); overflow: hidden; height: 100vh; }
+        button { cursor: pointer; font-family: inherit; }
         
-        .header { display: flex; align-items: center; justify-content: space-between; padding: 12px 20px; background: var(--panel); border-bottom: 1px solid var(--border); }
-        .header h1 { font-size: 18px; font-weight: 700; color: var(--accent); letter-spacing: 2px; }
-        .header-info { display: flex; align-items: center; gap: 12px; }
-        .status-badge { padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: 600; text-transform: uppercase; }
-        .status-badge.processed { background: #10b98122; color: var(--accent); }
-        .status-badge.queued { background: #ffb74d22; color: var(--warning); }
-        .status-badge.failed { background: #ff6b6b22; color: var(--error); }
+        .header { display: flex; align-items: center; gap: 12px; padding: 10px 20px; background: var(--panel); border-bottom: 1px solid var(--border); height: 50px; }
+        .logo { font-size: 22px; font-weight: 800; color: var(--accent); letter-spacing: 2px; cursor: pointer; font-family: 'Courier New', monospace; text-transform: uppercase; }
+        .logo:hover { opacity: 0.8; }
+        .breadcrumb { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-secondary); }
+        .breadcrumb span { cursor: default; }
+        .breadcrumb .link { cursor: pointer; color: var(--text-secondary); }
+        .breadcrumb .link:hover { color: var(--accent); }
+        .breadcrumb .current { color: var(--text); font-weight: 600; }
+        .header-spacer { flex: 1; }
+        .header-actions { display: flex; align-items: center; gap: 8px; }
+        .project-quick-select { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 4px 10px; font-size: 13px; }
+        .btn { padding: 6px 14px; border-radius: 4px; font-size: 13px; font-weight: 600; border: none; }
+        .btn-primary { background: var(--accent); color: #f5ede0; }
+        .btn-primary:hover { background: var(--accent-hover); }
+        .btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border); }
+        .btn-outline:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
+        .btn-danger { background: var(--error); color: #f5ede0; }
+        .btn-danger:hover { opacity: 0.9; }
+        .btn-sm { padding: 4px 10px; font-size: 12px; }
+        .btn-theme { background: var(--bg); border: 1px solid var(--border); color: var(--text-secondary); font-size: 18px; line-height: 1; padding: 2px 8px; border-radius: 4px; }
+        .btn-theme:hover { border-color: var(--accent); color: var(--accent); }
         
         .main { display: flex; height: calc(100vh - 50px); }
-        .sidebar { width: 280px; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
-        .sidebar-header { padding: 12px 16px; background: var(--bg); font-weight: 600; font-size: 12px; text-transform: uppercase; color: var(--text-secondary); border-bottom: 1px solid var(--border); }
+        
+        /* ── Home View ── */
+        #homeView { display: none; flex: 1; padding: 32px; overflow-y: auto; }
+        #homeView.active { display: block; }
+        .home-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+        .home-title { font-size: 24px; font-weight: 700; }
+        .project-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+        .project-card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 20px; cursor: pointer; transition: border-color 0.15s; }
+        .project-card:hover { border-color: var(--accent); }
+        .project-card-title { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+        .project-card-code { font-size: 12px; color: var(--text-secondary); margin-bottom: 12px; }
+        .project-card-meta { display: flex; gap: 16px; font-size: 12px; color: var(--text-secondary); }
+        .project-card-meta span { display: flex; align-items: center; gap: 4px; }
+        .empty-state { padding: 60px 20px; text-align: center; color: var(--text-secondary); }
+        .empty-state .big { font-size: 48px; margin-bottom: 12px; opacity: 0.3; }
+        
+        /* ── Project View ── */
+        #projectView { display: none; flex: 1; }
+        #projectView.active { display: flex; }
+        
+        .left-sidebar { width: 300px; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow-y: auto; }
+        .sidebar-section { border-bottom: 1px solid var(--border); }
+        .sidebar-section-header { padding: 10px 16px; background: var(--bg); font-weight: 600; font-size: 12px; text-transform: uppercase; color: var(--text-secondary); display: flex; justify-content: space-between; align-items: center; }
+        .sidebar-section-header .btn-icon { background: none; border: none; color: var(--text-secondary); font-size: 14px; padding: 2px 6px; }
+        .sidebar-section-header .btn-icon:hover { color: var(--accent); }
+        
+        .tz-content { padding: 12px 16px; font-size: 13px; line-height: 1.5; color: var(--text); max-height: 200px; overflow-y: auto; white-space: pre-wrap; }
+        .tz-content.empty { color: var(--text-secondary); font-style: italic; }
+        
         .model-list { flex: 1; overflow-y: auto; }
-        .model-item { padding: 12px 16px; cursor: pointer; border-bottom: 1px solid var(--border); }
+        .model-item { padding: 12px 16px; cursor: pointer; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
         .model-item:hover { background: var(--bg); }
         .model-item.active { background: var(--bg); border-left: 3px solid var(--accent); }
-        .model-item-title { font-size: 14px; margin-bottom: 4px; }
+        .model-item-info { flex: 1; min-width: 0; }
+        .model-item-title { font-size: 14px; margin-bottom: 2px; }
         .model-item-meta { font-size: 11px; color: var(--text-secondary); }
-        .viewer-container { flex: 1; display: flex; flex-direction: column; }
-        #viewer { flex: 1; background: #1a1a1a; position: relative; overflow: hidden; }
+        .model-item-actions { display: flex; gap: 4px; opacity: 0; transition: opacity 0.15s; }
+        .model-item:hover .model-item-actions { opacity: 1; }
+        .model-move-btn { background: none; border: none; color: var(--text-secondary); font-size: 16px; padding: 2px 6px; cursor: pointer; }
+        .model-move-btn:hover { color: var(--warning); }
+        .model-delete-btn { background: none; border: none; color: var(--text-secondary); font-size: 16px; padding: 2px 6px; cursor: pointer; }
+        .model-delete-btn:hover { color: var(--error); }
+        
+        .status-badge { padding: 3px 8px; border-radius: 3px; font-size: 11px; font-weight: 600; display: inline-block; }
+        .status-badge.processed { background: #cc293618; color: var(--accent); }
+        .status-badge.queued { background: #d4993a18; color: var(--warning); }
+        .status-badge.failed { background: #d4434e18; color: var(--error); }
+        .status-badge.uploaded { background: #8c847c18; color: var(--text-secondary); }
+        
+        .viewer-container { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+        #viewer { flex: 1; background: var(--panel); position: relative; overflow: hidden; }
         #viewer-container { width: 100%; height: 100%; }
-        .viewer-placeholder { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #888; text-align: center; z-index: 10; }
-        .right-panel { width: 350px; background: var(--panel); border-left: 1px solid var(--border); display: flex; flex-direction: column; }
+        .viewer-placeholder { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--text-secondary); text-align: center; z-index: 10; }
+        
+        .right-panel { width: 350px; background: var(--panel); border-left: 1px solid var(--border); display: flex; flex-direction: column; overflow-y: auto; }
         .panel-section { border-bottom: 1px solid var(--border); }
         .panel-header { padding: 10px 16px; background: var(--bg); font-weight: 600; font-size: 12px; text-transform: uppercase; color: var(--text-secondary); }
         .inspector-content { padding: 12px 16px; font-size: 13px; }
         .inspector-row { display: flex; margin-bottom: 8px; }
-        .inspector-label { width: 80px; color: var(--text-secondary); flex-shrink: 0; }
+        .inspector-label { width: 90px; color: var(--text-secondary); flex-shrink: 0; }
         .inspector-value { flex: 1; word-break: break-word; }
-        .issues-list { flex: 1; overflow-y: auto; padding: 8px; max-height: 400px; }
+        .issues-list { overflow-y: auto; padding: 8px; max-height: 350px; }
         .issue-item { padding: 10px 12px; margin-bottom: 8px; border-radius: 4px; border: 1px solid var(--border); cursor: pointer; }
         .issue-item:hover { background: var(--bg); }
         .issue-item.error { border-left: 3px solid var(--error); }
         .issue-item.warning { border-left: 3px solid var(--warning); }
         .issue-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
         .issue-badge { padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 600; }
-        .issue-badge.error { background: #ffebee; color: var(--error); }
-        .issue-badge.warning { background: #fff3e0; color: var(--warning); }
+        .issue-badge.error { background: #d4434e18; color: var(--error); }
+        .issue-badge.warning { background: #d4993a18; color: var(--warning); }
         .issue-key { font-size: 12px; color: var(--text-secondary); }
         .issue-message { font-size: 13px; }
-        .empty-state { padding: 40px 20px; text-align: center; color: var(--text-secondary); }
+        
+        /* ── Modal ── */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(20,18,16,0.7); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-overlay.active { display: flex; }
+        .modal { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; width: 520px; max-height: 80vh; overflow-y: auto; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+        .modal-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .modal-header h2 { font-size: 16px; font-weight: 600; }
+        .modal-close { background: none; border: none; color: var(--text-secondary); font-size: 20px; cursor: pointer; }
+        .modal-close:hover { color: var(--text); }
+        .modal-body { padding: 20px; }
+        .modal-footer { padding: 16px 20px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
+        .form-group { margin-bottom: 16px; }
+        .form-label { display: block; font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; }
+        .form-input { width: 100%; padding: 8px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: 14px; }
+        .form-input:focus { outline: none; border-color: var(--accent); }
+        .form-textarea { width: 100%; padding: 8px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: 14px; resize: vertical; min-height: 120px; font-family: inherit; }
+        .form-textarea:focus { outline: none; border-color: var(--accent); }
+        
+        /* ── Move Modal ── */
+        .project-radio-list { max-height: 240px; overflow-y: auto; }
+        .project-radio-item { padding: 10px 12px; cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: 10px; }
+        .project-radio-item:hover { background: var(--bg); }
+        .project-radio-item input[type="radio"] { accent-color: var(--accent); }
+        
+        .toast { position: fixed; bottom: 24px; right: 24px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 12px 20px; z-index: 2000; font-size: 13px; box-shadow: 0 4px 16px rgba(0,0,0,0.4); display: none; }
+        .toast.show { display: block; }
+        .toast.success { border-color: var(--accent); }
+        .toast.error { border-color: var(--error); }
+
+        /* ── TZ Page ── */
+        #tzView { display: none; flex: 1; }
+        #tzView.active { display: flex; }
+        .tz-layout { display: flex; flex: 1; min-height: 0; }
+        .tz-sidebar { width: 400px; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow-y: auto; flex-shrink: 0; }
+        .tz-main { flex: 1; display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+        .tz-toolbar { padding: 12px 20px; background: var(--panel); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; }
+        .tz-toolbar-title { font-size: 16px; font-weight: 600; }
+        .tz-toolbar-meta { font-size: 12px; color: var(--text-secondary); }
+        .tz-search { padding: 12px 20px; background: var(--bg); border-bottom: 1px solid var(--border); }
+        .tz-search-input { width: 100%; padding: 8px 12px 8px 36px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 13px; }
+        .tz-search-input:focus { outline: none; border-color: var(--accent); }
+        .tz-search-wrap { position: relative; }
+        .tz-search-wrap .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-secondary); font-size: 14px; }
+        .tz-class-filter { padding: 0 20px 12px; background: var(--bg); border-bottom: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: 6px; }
+        .tz-class-chip { padding: 4px 12px; border-radius: 12px; font-size: 12px; cursor: pointer; background: var(--bg); border: 1px solid var(--border); color: var(--text-secondary); }
+        .tz-class-chip:hover { border-color: var(--accent); color: var(--accent); }
+        .tz-class-chip.active { background: var(--accent); border-color: var(--accent); color: #f5ede0; font-weight: 600; }
+        .tz-class-chip .count { margin-left: 4px; opacity: 0.6; }
+        
+        /* ── Data Page ── */
+        #dataView { display: none; flex: 1; overflow: hidden; }
+        #dataView.active { display: flex; }
+        .data-layout { display: flex; flex: 1; }
+        .data-sidebar { width: 400px; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow-y: auto; flex-shrink: 0; }
+        .data-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        .data-cat-list { padding: 12px; display: flex; flex-direction: column; gap: 2px; }
+        .data-cat-item { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: var(--bg); border-radius: 6px 6px 0 0; border: 1px solid var(--border); }
+        .data-cat-item .class-icon { display: inline-block; width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; border: 2px solid; }
+        .data-cat-item .cat-handle { cursor: pointer; color: var(--text-secondary); font-size: 12px; width: 16px; transition: transform 0.15s; }
+        .data-cat-item .cat-name { flex: 1; font-size: 13px; cursor: pointer; }
+        .data-cat-item .cat-name:hover { color: var(--accent); }
+        .data-cat-item .cat-count { font-size: 12px; color: var(--text-secondary); background: var(--panel); padding: 2px 8px; border-radius: 10px; }
+        .data-cat-item .cat-del { cursor: pointer; color: var(--text-secondary); font-size: 14px; opacity: 0.4; }
+        .data-cat-item .cat-del:hover { opacity: 1; color: var(--error); }
+        .data-cat-add { display: flex; gap: 8px; padding: 12px; }
+        .data-cat-add input { flex: 1; padding: 8px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 13px; }
+        .data-cat-add input:focus { outline: none; border-color: var(--accent); }
+        .data-cat-columns { display: none; flex-direction: column; gap: 4px; padding: 8px 12px 12px; background: var(--bg); border: 1px solid var(--border); border-top: none; border-radius: 0 0 6px 6px; margin-bottom: 4px; }
+        .data-cat-columns.open { display: flex; }
+        .data-col-header { display: flex; gap: 8px; align-items: center; font-size: 11px; color: var(--text-secondary); text-transform: uppercase; padding: 4px 0; }
+        .data-col-row { display: flex; gap: 8px; align-items: center; }
+        .data-col-row input { padding: 5px 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: 12px; flex: 2; }
+        .data-col-row input:focus { outline: none; border-color: var(--accent); }
+
+        .data-col-del { cursor: pointer; color: var(--text-secondary); font-size: 14px; opacity: 0.4; width: 24px; text-align: center; }
+        .data-col-del:hover { opacity: 1; color: var(--error); }
+        .data-col-add { cursor: pointer; font-size: 12px; color: var(--accent); padding: 6px 0; opacity: 0.7; }
+        .data-col-add:hover { opacity: 1; }
+        .tz-table-wrap { flex: 1; min-height: 0; overflow-y: auto; padding: 12px; }
+        .tz-table { display: flex; flex-direction: column; gap: 8px; }
+        .tz-card { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 12px 16px; cursor: pointer; transition: border-color 0.15s; }
+        .tz-card:hover { border-color: var(--accent); }
+        .tz-card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+        .tz-card .class-icon { display: inline-block; width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; border: 2px solid; }
+        .tz-card-name { font-weight: 600; font-size: 14px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .tz-card-cat { font-size: 11px; color: var(--text-secondary); background: var(--bg); padding: 2px 8px; border-radius: 4px; flex-shrink: 0; border: 1px solid var(--border); }
+        .tz-card-props { display: flex; flex-wrap: wrap; gap: 4px 16px; }
+        .tz-card-prop { font-size: 12px; min-width: 120px; flex: 1 0 auto; }
+        .tz-card-prop-key { color: var(--text-secondary); }
+        .tz-card-prop-val { color: var(--text); margin-left: 4px; }
+        .tz-card-prop-val.empty { color: var(--text-secondary); opacity: 0.4; }
+        .empty-message { padding: 60px 20px; text-align: center; color: var(--text-secondary); }
+        .tz-summary { padding: 16px 20px; background: var(--panel); border-top: 1px solid var(--border); display: flex; gap: 24px; font-size: 12px; color: var(--text-secondary); }
+        .tz-summary span strong { color: var(--text); }
+        .tz-view-content { padding: 16px; font-size: 13px; line-height: 1.6; white-space: pre-wrap; }
+        .tz-view-content.empty { color: var(--text-secondary); font-style: italic; }
+        .tz-sidebar-section { border-bottom: 1px solid var(--border); }
+        .tz-sidebar-header { padding: 12px 16px; background: var(--bg); font-weight: 600; font-size: 12px; text-transform: uppercase; color: var(--text-secondary); display: flex; justify-content: space-between; align-items: center; }
+        .tz-sidebar-header .btn-icon { background: none; border: none; color: var(--text-secondary); font-size: 14px; padding: 2px 6px; }
+        .tz-sidebar-header .btn-icon:hover { color: var(--accent); }
+        .tz-section-link { padding: 10px 16px; cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 8px; }
+        .tz-section-link:hover { background: var(--bg); }
+        .tz-section-link.active { background: var(--accent); color: #f5ede0; font-weight: 600; }
+        .tz-section-link.active .dot { background: #f5ede0; }
+        .tz-section-link .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+        .tz-section-link .dot.green { background: var(--accent); }
+        .tz-section-link .dot.yellow { background: var(--warning); }
+        .tz-section-link .dot.gray { background: var(--border); }
+        .tz-prop-key { font-size: 11px; color: var(--text-secondary); text-transform: uppercase; }
+        .tz-prop-val { font-size: 13px; }
+        .tz-meta-grid { padding: 12px 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+        /* Data page tabs */
+        .data-tabs { display: flex; gap: 4px; }
+        .data-tab { padding: 6px 14px; font-size: 13px; cursor: pointer; border-radius: 6px; color: var(--text-secondary); background: var(--bg); border: 1px solid var(--border); white-space: nowrap; }
+        .data-tab:hover { color: var(--text); border-color: var(--accent); }
+        .data-tab.active { color: var(--accent); border-color: var(--accent); background: var(--accent-light); }
+        .data-scroll { flex: 1; overflow-y: auto; padding: 16px; }
+        /* TZ file block */
+        .tz-file-block { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+        .tz-file-info { font-size: 13px; color: var(--text-secondary); margin-bottom: 12px; }
+        .tz-file-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        /* TZ fields */
+        .tz-fields { display: flex; flex-direction: column; gap: 4px; }
+        .tz-field-label { font-size: 13px; font-weight: 600; margin-top: 12px; margin-bottom: 4px; color: var(--text); }
+        .tz-field-label:first-child { margin-top: 0; }
+        .tz-field-input { resize: vertical; min-height: 80px; }
+        /* TZ history */
+        .tz-history-item { padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 12px; display: flex; justify-content: space-between; align-items: center; }
+        .tz-history-item:last-child { border-bottom: none; }
+        .tz-history-source { padding: 1px 6px; border-radius: 4px; font-size: 11px; background: var(--bg); border: 1px solid var(--border); }
+
     </style>
-  <script type="module" crossorigin src="/assets/index-CInFJVtX.js"></script>
+  <script type="module" crossorigin src="/assets/index-1yxmNFEZ.js"></script>
 </head>
 <body>
     <div class="header">
-        <h1>LYNX</h1>
-        <div class="header-info">
-            <span id="modelName">-</span>
-            <span class="status-badge" id="modelStatus">-</span>
+        <div class="logo" onclick="goHome()">LYNX</div>
+        <div class="breadcrumb" id="breadcrumb">
+            <span class="link" onclick="goHome()">Проекты</span>
+        </div>
+        <div class="header-spacer"></div>
+        <div class="header-actions">
+            <button class="btn btn-sm btn-theme" id="btnThemeToggle" onclick="toggleTheme()" title="Переключить тему"></button>
+        </div>
+        <div class="header-actions">
+            <select class="project-quick-select" id="projectQuickSelect" onchange="onQuickSelectProject(this.value)" style="display:none">
+            </select>
+            <button class="btn btn-primary" id="btnNewProject" onclick="showCreateProjectModal()">+ Новый проект</button>
         </div>
     </div>
-    
+
     <div class="main">
-        <div class="sidebar">
-            <div class="sidebar-header">Модели</div>
-            <div class="model-list" id="modelList"><div class="empty-state">Загрузка...</div></div>
+        <!-- Home View -->
+        <div id="homeView" class="active">
+            <div class="home-header">
+                <div class="home-title">Проекты</div>
+            </div>
+            <div class="project-grid" id="projectList"></div>
         </div>
-        
-        <div class="viewer-container">
-            <div id="viewer">
-                <div id="viewer-container"></div>
-                <div class="viewer-placeholder" id="viewerPlaceholder">Загрузка 3D...</div>
+
+        <!-- Project View -->
+        <div id="projectView">
+            <div class="left-sidebar">
+                <div class="sidebar-section">
+                    <div class="sidebar-section-header">
+                        Техническое задание
+                        <span style="display:flex;gap:4px">
+                            <button class="btn-icon" onclick="showEditTzModal()" title="Редактировать ТЗ">✎</button>
+                        </span>
+                    </div>
+                    <div class="tz-content" id="tzContent" style="font-size:12px;color:var(--text-secondary)">Нет ТЗ</div>
+                </div>
+                <div class="sidebar-section">
+                    <div class="sidebar-section-header">
+                        Навигация
+                    </div>
+                    <div style="padding:8px 12px;display:flex;flex-direction:column;gap:4px">
+                        <button class="btn" onclick="showTzPage()" style="text-align:left;padding:8px 12px;font-size:12px">📋 Заполнение элементов модели</button>
+                        <button class="btn" onclick="showDataPage()" style="text-align:left;padding:8px 12px;font-size:12px">⚙ Данные о проекте и ТЗ</button>
+                    </div>
+                </div>
+                <div class="sidebar-section">
+                    <div class="sidebar-section-header">
+                        Ключи автопривязки
+                        <button class="btn-icon" onclick="showEditKeywordsModal()" title="Настроить ключевые слова">✎</button>
+                    </div>
+                    <div class="tz-content" id="keywordsContent" style="max-height:60px;font-size:12px;color:var(--text-secondary)">не заданы</div>
+                </div>
+                <div class="sidebar-section">
+                    <div class="sidebar-section-header">
+                        Модели
+                        <span style="display:flex;gap:4px">
+                            <button class="btn-icon" onclick="showBindModelModal()" title="Привязать существующую">⊞</button>
+                            <button class="btn-icon" onclick="showUploadModelModal()" title="Загрузить IFC">+</button>
+                        </span>
+                    </div>
+                </div>
+                <div class="model-list" id="modelList">
+                    <div class="empty-state">Загрузка...</div>
+                </div>
+            </div>
+
+            <div class="viewer-container">
+                <div id="viewer">
+                    <div id="viewer-container"></div>
+                    <div class="viewer-placeholder" id="viewerPlaceholder">Выберите модель для просмотра</div>
+                </div>
+            </div>
+
+            <div class="right-panel">
+                <div class="panel-section">
+                    <div class="panel-header">Инспектор</div>
+                    <div class="inspector-content" id="inspector"><div class="empty-state">Выберите элемент</div></div>
+                </div>
+                <div class="panel-section" style="flex:1; display:flex; flex-direction:column;">
+                    <div class="panel-header">Ошибки</div>
+                    <div class="issues-list" id="issuesList"><div class="empty-state">Нет данных</div></div>
+                </div>
             </div>
         </div>
-        
-        <div class="right-panel">
-            <div class="panel-section">
-                <div class="panel-header">Инспектор</div>
-                <div class="inspector-content" id="inspector"><div class="empty-state">Выберите элемент</div></div>
+
+        <!-- Elements View (Заполнение элементов модели) -->
+        <div id="tzView">
+            <div class="tz-layout">
+                <div class="tz-sidebar">
+                    <div class="tz-sidebar-section">
+                        <div class="tz-sidebar-header">Разделы</div>
+                        <div id="tzSectionList">
+                            <div class="tz-section-link"><span class="dot green"></span> Все элементы</div>
+                        </div>
+                    </div>
+                    <div class="tz-sidebar-section">
+                        <div class="tz-sidebar-header">Информация о проекте</div>
+                        <div class="tz-meta-grid" id="tzMetaGrid">
+                            <div><div class="tz-prop-key">Код</div><div class="tz-prop-val" id="tzMetaCode">-</div></div>
+                            <div><div class="tz-prop-key">Моделей</div><div class="tz-prop-val" id="tzMetaModels">-</div></div>
+                            <div><div class="tz-prop-key">Элементов</div><div class="tz-prop-val" id="tzMetaElements">-</div></div>
+                            <div><div class="tz-prop-key">Ключи автопривязки</div><div class="tz-prop-val" id="tzMetaKeywords">-</div></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="tz-main">
+                    <div class="tz-toolbar">
+                        <span style="color:var(--accent);cursor:pointer;font-size:18px" onclick="goToProject()">←</span>
+                        <div>
+                            <div class="tz-toolbar-title" id="tzPageTitle">Элементы</div>
+                            <div class="tz-toolbar-meta" id="tzPageMeta">Загрузка...</div>
+                        </div>
+                    </div>
+                    <div class="tz-search">
+                        <div class="tz-search-wrap">
+                            <span class="search-icon">🔍</span>
+                            <input class="tz-search-input" id="tzSearchInput" placeholder="Поиск элементов по имени, классу, этажу..." oninput="tzFilterElements()" />
+                        </div>
+                    </div>
+                    <div class="tz-class-filter" id="tzClassFilter"></div>
+                    <div class="tz-table-wrap" id="tzTableWrap">
+                        <div class="tz-table" id="tzTable">
+                            <div class="empty-message">Загрузка элементов...</div>
+                        </div>
+                    </div>
+                    <div class="tz-summary" id="tzSummary">
+                        <span>Элементов: <strong id="tzCount">0</strong></span>
+                        <span>Моделей: <strong id="tzModelCount">0</strong></span>
+                        <span>Классов: <strong id="tzClassCount">0</strong></span>
+                    </div>
+                </div>
             </div>
-            <div class="panel-section" style="flex:1; display:flex; flex-direction:column;">
-                <div class="panel-header">Ошибки</div>
-                <div class="issues-list" id="issuesList"><div class="empty-state">Нет данных</div></div>
+        </div>
+
+        <!-- Data View (Данные о проекте и обработка ТЗ) -->
+        <div id="dataView">
+            <div class="data-layout">
+                <div class="data-sidebar">
+                    <div class="tz-sidebar-section">
+                        <div class="tz-sidebar-header">Данные о проекте</div>
+                        <div class="tz-meta-grid" id="dataMetaGrid">
+                            <div><div class="tz-prop-key">Проект</div><div class="tz-prop-val" id="dataMetaProjectName">-</div></div>
+                            <div><div class="tz-prop-key">Код</div><div class="tz-prop-val" id="dataMetaCode">-</div></div>
+                            <div><div class="tz-prop-key">Моделей</div><div class="tz-prop-val" id="dataMetaModels">-</div></div>
+                            <div><div class="tz-prop-key">Элементов</div><div class="tz-prop-val" id="dataMetaElements">-</div></div>
+                        </div>
+                    </div>
+                    <div class="tz-sidebar-section">
+                        <div class="tz-sidebar-header">Настройка категорий</div>
+                        <div style="padding:12px;font-size:12px;color:var(--text-secondary);line-height:1.5">
+                            Категории определяются по IFC-параметру "Модель". Нажмите ▶ чтобы настроить отслеживаемые параметры и формат отображения (знаков после запятой).
+                        </div>
+                        <div class="data-cat-add">
+                            <input id="dataNewCatName" placeholder="Новая категория..." />
+                            <button class="btn-sm" onclick="addCategory()">+</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="data-main">
+                    <div class="tz-toolbar">
+                        <span style="color:var(--accent);cursor:pointer;font-size:18px" onclick="goToProject()">←</span>
+                        <div>
+                            <div class="tz-toolbar-title">Данные о проекте и обработка ТЗ</div>
+                            <div class="tz-toolbar-meta" id="dataPageMeta">Настройка категорий элементов модели</div>
+                        </div>
+                        <span style="flex:1"></span>
+                        <div class="data-tabs">
+                            <span class="data-tab active" data-tab="categories" onclick="switchDataTab('categories')">📋 Категории</span>
+                            <span class="data-tab" data-tab="tz" onclick="switchDataTab('tz')">📄 ТЗ проекта</span>
+                        </div>
+                        <span style="flex:1"></span>
+                        <button class="btn categories-only" onclick="saveCategories()" style="padding:6px 16px;font-size:13px">Сохранить категории</button>
+                        <button class="btn tz-only" onclick="saveTzSection()" style="padding:6px 16px;font-size:13px;display:none">💾 Сохранить ТЗ</button>
+                    </div>
+                    <div id="dataCategoriesTab" class="data-scroll" style="flex:1;overflow-y:auto;padding:16px">
+                        <div style="font-size:14px;font-weight:600;margin-bottom:12px">Список категорий</div>
+                        <div id="dataCatList" class="data-cat-list">
+                            <div class="empty-message" style="padding:40px;text-align:center;color:var(--text-secondary)">Загрузка...</div>
+                        </div>
+                    </div>
+                    <div id="dataTzTab" class="data-scroll" style="flex:1;overflow-y:auto;padding:16px;display:none">
+                        <div class="tz-file-block">
+                            <div class="tz-file-info" id="tzFileInfo">Файл не загружен</div>
+                            <div class="tz-file-actions">
+                                <button class="btn" onclick="document.getElementById('tzFileInput').click()">📄 Загрузить PDF/Excel</button>
+                                <input type="file" id="tzFileInput" accept=".pdf,.xlsx,.xls" style="display:none" onchange="uploadTzFile(this.files[0])" />
+                                <button class="btn" id="btnParseTz" onclick="parseTzAi()">⚡ Распознать через ИИ</button>
+                                <button class="btn btn-outline" id="btnDownloadTz" onclick="downloadTzFile()" style="display:none">📥 Скачать оригинал</button>
+                            </div>
+                        </div>
+                        <div class="tz-fields">
+                            <label class="tz-field-label">Общее описание</label>
+                            <textarea class="form-textarea tz-field-input" id="tzGeneral" rows="4" placeholder="Общее описание проекта, цели, требования к BIM-модели"></textarea>
+                            <label class="tz-field-label">Водоснабжение</label>
+                            <textarea class="form-textarea tz-field-input" id="tzWaterSupply" rows="4" placeholder="Требования к разделу водоснабжения"></textarea>
+                            <label class="tz-field-label">Водоотведение</label>
+                            <textarea class="form-textarea tz-field-input" id="tzSewerage" rows="4" placeholder="Требования к разделу водоотведения и канализации"></textarea>
+                            <label class="tz-field-label">Пожаротушение</label>
+                            <textarea class="form-textarea tz-field-input" id="tzFireFighting" rows="4" placeholder="Требования к разделу пожаротушения"></textarea>
+                            <label class="tz-field-label">Прочие решения</label>
+                            <textarea class="form-textarea tz-field-input" id="tzOther" rows="4" placeholder="Прочие инженерные решения (отопление, вентиляция, электрика и т.д.)"></textarea>
+                        </div>
+                        <details class="tz-history" style="margin-top:16px">
+                            <summary style="cursor:pointer;color:var(--text-secondary);font-size:13px">История изменений</summary>
+                            <div id="tzHistoryList" style="margin-top:8px"></div>
+                        </details>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
+
+    <!-- Modal: Create / Edit Project -->
+    <div class="modal-overlay" id="projectModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="projectModalTitle">Новый проект</h2>
+                <button class="modal-close" onclick="closeModal('projectModal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Код проекта</label>
+                    <input class="form-input" id="projectCode" placeholder="Напр. PRJ-001" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Название</label>
+                    <input class="form-input" id="projectName" placeholder="Напр. ЖК Рассвет" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Техническое задание</label>
+                    <textarea class="form-textarea" id="projectTz" placeholder="Описание требований к модели..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Ключи автопривязки моделей</label>
+                    <textarea class="form-input" id="projectKeywords" placeholder="Напр. АР, КМ, ОВ" style="min-height:auto"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeModal('projectModal')">Отмена</button>
+                <button class="btn btn-primary" id="projectSaveBtn" onclick="saveProject()">Создать</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Edit TZ -->
+    <div class="modal-overlay" id="tzModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>Техническое задание</h2>
+                <button class="modal-close" onclick="closeModal('tzModal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">ТЗ проекта</label>
+                    <textarea class="form-textarea" id="tzEditor" placeholder="Опишите требования к BIM-модели..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeModal('tzModal')">Отмена</button>
+                <button class="btn btn-primary" onclick="saveTz()">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Upload Model -->
+    <div class="modal-overlay" id="uploadModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>Загрузить IFC</h2>
+                <button class="modal-close" onclick="closeModal('uploadModal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Название модели</label>
+                    <input class="form-input" id="uploadModelName" placeholder="Напр. АР_Этаж1" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">IFC файл</label>
+                    <input type="file" class="form-input" id="uploadFile" accept=".ifc" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Ruleset ID</label>
+                    <input class="form-input" id="uploadRulesetId" value="default" />
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeModal('uploadModal')">Отмена</button>
+                <button class="btn btn-primary" onclick="uploadModel()">Загрузить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Move Model -->
+    <div class="modal-overlay" id="moveModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>Переместить модель</h2>
+                <button class="modal-close" onclick="closeModal('moveModal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom:12px;font-size:13px;color:var(--text-secondary)">Выберите целевой проект:</p>
+                <div class="project-radio-list" id="moveProjectList"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeModal('moveModal')">Отмена</button>
+                <button class="btn btn-primary" onclick="confirmMoveModel()">Переместить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Edit Keywords -->
+    <div class="modal-overlay" id="keywordsModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>Ключи автопривязки моделей</h2>
+                <button class="modal-close" onclick="closeModal('keywordsModal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Ключевые слова (через запятую)</label>
+                    <textarea class="form-textarea" id="keywordsEditor" placeholder="Напр. АР, КМ, ОВ, ВК, ЭОМ" style="min-height:80px"></textarea>
+                    <p style="font-size:12px;color:var(--text-secondary);margin-top:6px">Модели, в названии которых есть эти слова, будут автоматически привязываться к проекту</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeModal('keywordsModal')">Отмена</button>
+                <button class="btn btn-primary" onclick="saveKeywords()">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Bind Existing Model -->
+    <div class="modal-overlay" id="bindModal">
+        <div class="modal" style="width:600px">
+            <div class="modal-header">
+                <h2>Привязать модель к проекту</h2>
+                <button class="modal-close" onclick="closeModal('bindModal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <input class="form-input" id="bindSearch" placeholder="Поиск по названию..." oninput="filterBindModels()" />
+                </div>
+                <div class="project-radio-list" id="bindModelList" style="max-height:360px">
+                    <div class="empty-state">Загрузка...</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeModal('bindModal')">Отмена</button>
+                <button class="btn btn-primary" onclick="confirmBindModel()">Привязать</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
 
 </body>
 </html>

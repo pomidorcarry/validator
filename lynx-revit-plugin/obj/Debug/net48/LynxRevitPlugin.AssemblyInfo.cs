@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("LynxRevitPlugin")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+9c86e11a9c6a44a9f16f4c86558bd4f1f5ea2b48")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+3ea59ca2380db821bbaedd6fee5ba895e6c39b9e")]
 [assembly: System.Reflection.AssemblyProductAttribute("LynxRevitPlugin")]
 [assembly: System.Reflection.AssemblyTitleAttribute("LynxRevitPlugin")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

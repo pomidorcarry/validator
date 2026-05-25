@@ -15,6 +15,16 @@ class Project(Base):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     code = Column(String, nullable=False)
     name = Column(String, nullable=False)
+    technical_specification = Column(Text, default="")
+    auto_bind_keywords = Column(Text, default="")
+    tz_file_name = Column(String, default=None)
+    tz_file_path = Column(String, default=None)
+    tz_file_uploaded_at = Column(DateTime, default=None)
+    tz_general = Column(Text, default="")
+    tz_water_supply = Column(Text, default="")
+    tz_sewerage = Column(Text, default="")
+    tz_fire_fighting = Column(Text, default="")
+    tz_other = Column(Text, default="")
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
@@ -27,6 +37,15 @@ class Ruleset(Base):
     source_text = Column(Text)
     ids_xml = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class ProjectCategory(Base):
+    __tablename__ = "project_categories"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    project_id = Column(String, nullable=False, index=True)
+    name = Column(String, nullable=False)
+    display_order = Column(Integer, default=0)
+    columns_config = Column(JSON, default=list)
 
 
 class ModelVersion(Base):
@@ -142,6 +161,17 @@ class Report(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+class TzVersion(Base):
+    __tablename__ = "tz_versions"
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    project_id = Column(String, nullable=False, index=True)
+    version = Column(Integer, nullable=False)
+    data_jsonb = Column(JSON, nullable=False)
+    source = Column(String, default="manual")
+    file_name = Column(String)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 engine = None
 async_engine = None
 async_session = None
@@ -156,6 +186,22 @@ async def init_db():
     
     async with async_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        def _migrate(conn):
+            import sqlalchemy as sa
+            insp = sa.inspect(conn)
+            # Migration: add columns_config to project_categories
+            cats_cols = [c["name"] for c in insp.get_columns("project_categories")]
+            if "columns_config" not in cats_cols:
+                conn.execute(sa.text("ALTER TABLE project_categories ADD COLUMN columns_config JSON"))
+            # Migration: add tz columns to projects
+            proj_cols = [c["name"] for c in insp.get_columns("projects")]
+            tz_cols = ["tz_file_name", "tz_file_path", "tz_file_uploaded_at",
+                        "tz_general", "tz_water_supply", "tz_sewerage",
+                        "tz_fire_fighting", "tz_other"]
+            for col in tz_cols:
+                if col not in proj_cols:
+                    conn.execute(sa.text(f"ALTER TABLE projects ADD COLUMN {col} TEXT"))
+        await conn.run_sync(_migrate)
 
 
 async def create_model_version(
@@ -223,23 +269,7 @@ async def get_issues(model_version_id: str) -> list:
         ]
 
 
-async def list_all_models() -> list:
-    async with async_session() as session:
-        from sqlalchemy import select
-        result = await session.execute(
-            select(ModelVersion).order_by(ModelVersion.created_at.desc())
-        )
-        models = result.scalars().all()
-        return [
-            {
-                "id": m.id,
-                "model_name": m.model_name,
-                "status": m.status,
-                "created_at": m.created_at.isoformat() if m.created_at else None,
-                "processed_at": m.processed_at.isoformat() if m.processed_at else None,
-            }
-            for m in models
-        ]
+
 
 
 async def get_elements(model_version_id: str) -> list:
@@ -259,7 +289,469 @@ async def get_elements(model_version_id: str) -> list:
                 "type_name": e.type_name,
                 "storey_name": e.storey_name,
                 "system_name": e.system_name,
+                "model_group": extract_model_group(e.raw_psets_jsonb, e.normalized_jsonb, e.ifc_class),
+                "raw_psets_jsonb": e.raw_psets_jsonb,
                 "normalized_jsonb": e.normalized_jsonb,
             }
             for e in elements
+        ]
+
+
+def extract_model_group(raw_psets, normalized, ifc_class):
+    """Извлекает 'Модель' из raw-psets элемента."""
+    if not raw_psets:
+        return ifc_class
+    keys = ["Модель", "Model", "Группа модели", "GruppaModeli", "ModelGroup", "Gruppa", "Group"]
+    if isinstance(raw_psets, dict):
+        for pset_name, props in raw_psets.items():
+            if isinstance(props, dict):
+                for key, val in props.items():
+                    if key in keys and val and str(val).strip():
+                        return str(val).strip()
+                for key, val in props.items():
+                    if key.lower().replace(" ", "") in ["модель", "модели", "model", "группа", "group"] and val and str(val).strip():
+                        return str(val).strip()
+    return ifc_class
+
+
+# ── Projects ──────────────────────────────────────────────────────
+
+async def create_project(
+    project_id: str,
+    code: str,
+    name: str,
+    technical_specification: str = "",
+    auto_bind_keywords: str = "",
+) -> dict:
+    async with async_session() as session:
+        p = Project(
+            id=project_id,
+            code=code,
+            name=name,
+            technical_specification=technical_specification,
+            auto_bind_keywords=auto_bind_keywords,
+        )
+        session.add(p)
+        await session.commit()
+        await session.refresh(p)
+        return {
+            "id": p.id,
+            "code": p.code,
+            "name": p.name,
+            "technical_specification": p.technical_specification,
+            "auto_bind_keywords": p.auto_bind_keywords,
+            "created_at": p.created_at.isoformat() if p.created_at else None,
+        }
+
+
+async def list_projects() -> list:
+    async with async_session() as session:
+        from sqlalchemy import select, func
+        projects = (await session.execute(
+            select(Project).order_by(Project.created_at.desc())
+        )).scalars().all()
+        result = []
+        for p in projects:
+            count_result = await session.execute(
+                select(func.count()).select_from(ModelVersion).where(ModelVersion.project_id == p.id)
+            )
+            result.append({
+                "id": p.id,
+                "code": p.code,
+                "name": p.name,
+                "models_count": count_result.scalar() or 0,
+                "technical_specification": p.technical_specification,
+                "auto_bind_keywords": p.auto_bind_keywords,
+                "created_at": p.created_at.isoformat() if p.created_at else None,
+            })
+        return result
+
+
+async def get_project(project_id: str) -> Optional[dict]:
+    async with async_session() as session:
+        from sqlalchemy import select, func
+        result = await session.execute(
+            select(Project).where(Project.id == project_id)
+        )
+        p = result.scalar_one_or_none()
+        if not p:
+            return None
+        count_result = await session.execute(
+            select(func.count()).select_from(ModelVersion).where(ModelVersion.project_id == project_id)
+        )
+        models_count = count_result.scalar() or 0
+        return {
+            "id": p.id,
+            "code": p.code,
+            "name": p.name,
+            "technical_specification": p.technical_specification,
+            "auto_bind_keywords": p.auto_bind_keywords,
+            "models_count": models_count,
+            "created_at": p.created_at.isoformat() if p.created_at else None,
+        }
+
+
+async def update_project(project_id: str, name: str = None, technical_specification: str = None,
+                         auto_bind_keywords: str = None) -> Optional[dict]:
+    async with async_session() as session:
+        from sqlalchemy import select
+        result = await session.execute(
+            select(Project).where(Project.id == project_id)
+        )
+        p = result.scalar_one_or_none()
+        if not p:
+            return None
+        if name is not None:
+            p.name = name
+        if technical_specification is not None:
+            p.technical_specification = technical_specification
+        if auto_bind_keywords is not None:
+            p.auto_bind_keywords = auto_bind_keywords
+        await session.commit()
+        await session.refresh(p)
+        return {
+            "id": p.id,
+            "code": p.code,
+            "name": p.name,
+            "technical_specification": p.technical_specification,
+            "auto_bind_keywords": p.auto_bind_keywords,
+            "created_at": p.created_at.isoformat() if p.created_at else None,
+        }
+
+
+async def delete_project(project_id: str) -> bool:
+    async with async_session() as session:
+        from sqlalchemy import select
+        result = await session.execute(
+            select(Project).where(Project.id == project_id)
+        )
+        p = result.scalar_one_or_none()
+        if not p:
+            return False
+        await session.delete(p)
+        await session.commit()
+        return True
+
+
+# ── Model helpers ─────────────────────────────────────────────────
+
+async def list_all_models(project_id: Optional[str] = None) -> list:
+    async with async_session() as session:
+        from sqlalchemy import select
+        q = select(ModelVersion).order_by(ModelVersion.created_at.desc())
+        if project_id:
+            q = q.where(ModelVersion.project_id == project_id)
+        result = await session.execute(q)
+        models = result.scalars().all()
+        return [
+            {
+                "id": m.id,
+                "project_id": m.project_id,
+                "model_name": m.model_name,
+                "status": m.status,
+                "created_at": m.created_at.isoformat() if m.created_at else None,
+                "processed_at": m.processed_at.isoformat() if m.processed_at else None,
+            }
+            for m in models
+        ]
+
+
+async def move_model_to_project(model_id: str, target_project_id: str) -> Optional[dict]:
+    async with async_session() as session:
+        from sqlalchemy import select
+        result = await session.execute(
+            select(ModelVersion).where(ModelVersion.id == model_id)
+        )
+        mv = result.scalar_one_or_none()
+        if not mv:
+            return None
+        mv.project_id = target_project_id
+        await session.commit()
+        await session.refresh(mv)
+        return {
+            "id": mv.id,
+            "project_id": mv.project_id,
+            "model_name": mv.model_name,
+            "status": mv.status,
+        }
+
+
+DEFAULT_CATEGORIES = [
+    "Труба металлическая",
+    "Труба полимерная",
+    "Металлическая соединительная деталь трубы",
+    "Полимерная соединительная деталь трубы",
+    "Арматура труб",
+    "Оборудование",
+    "Сантехнический прибор",
+    "Изоляция рулонная",
+    "Изоляция трубчатая",
+    "Невалидируемое семейство",
+]
+
+DEFAULT_COLUMNS = {
+    "Труба металлическая": [
+        {"label": "Секция", "keys": ["Секция", "Section"], "format": None},
+        {"label": "Часть системы", "keys": ["Часть системы", "SystemPart", "PartOfSystem"], "format": None},
+        {"label": "Этаж", "keys": ["Этаж", "Storey", "Level"], "format": None},
+        {"label": "Вид", "keys": ["Вид", "Type", "PipeType"], "format": None},
+        {"label": "Размер", "keys": ["Размер", "Size", "DN", "NominalDiameter"], "format": None},
+        {"label": "Толщина стенки", "keys": ["Толщина стенки", "WallThickness"], "format": {"decimals": 2}},
+        {"label": "Длина, мм", "keys": ["Длина", "Length"], "format": {"decimals": 1}},
+        {"label": "Стадия", "keys": ["Стадия проектирования", "DesignStage"], "format": None},
+    ],
+    "Труба полимерная": [
+        {"label": "Секция", "keys": ["Секция", "Section"], "format": None},
+        {"label": "Часть системы", "keys": ["Часть системы", "SystemPart", "PartOfSystem"], "format": None},
+        {"label": "Вид", "keys": ["Вид", "Type", "PipeType"], "format": None},
+        {"label": "Размер", "keys": ["Размер", "Size", "DN", "NominalDiameter"], "format": None},
+        {"label": "Толщина стенки", "keys": ["Толщина стенки", "WallThickness"], "format": {"decimals": 2}},
+        {"label": "Длина, мм", "keys": ["Длина", "Length"], "format": {"decimals": 1}},
+    ],
+    "Металлическая соединительная деталь трубы": [
+        {"label": "Секция", "keys": ["Секция", "Section"], "format": None},
+        {"label": "Часть системы", "keys": ["Часть системы", "SystemPart", "PartOfSystem"], "format": None},
+        {"label": "Вид", "keys": ["Вид", "Type", "FittingType"], "format": None},
+        {"label": "Размер", "keys": ["Размер", "Size", "DN", "NominalDiameter"], "format": None},
+    ],
+    "Полимерная соединительная деталь трубы": [
+        {"label": "Секция", "keys": ["Секция", "Section"], "format": None},
+        {"label": "Часть системы", "keys": ["Часть системы", "SystemPart", "PartOfSystem"], "format": None},
+        {"label": "Вид", "keys": ["Вид", "Type", "FittingType"], "format": None},
+        {"label": "Размер", "keys": ["Размер", "Size", "DN", "NominalDiameter"], "format": None},
+    ],
+    "Арматура труб": [
+        {"label": "Секция", "keys": ["Секция", "Section"], "format": None},
+        {"label": "Часть системы", "keys": ["Часть системы", "SystemPart", "PartOfSystem"], "format": None},
+        {"label": "Вид", "keys": ["Вид", "Type", "ValveType"], "format": None},
+        {"label": "Размер", "keys": ["Размер", "Size", "DN", "NominalDiameter"], "format": None},
+        {"label": "Материал", "keys": ["Материал", "Material"], "format": None},
+    ],
+    "Арматура": [
+        {"label": "Секция", "keys": ["Секция", "Section"], "format": None},
+        {"label": "Часть системы", "keys": ["Часть системы", "SystemPart", "PartOfSystem"], "format": None},
+        {"label": "Вид", "keys": ["Вид", "Type", "ValveType"], "format": None},
+        {"label": "Размер", "keys": ["Размер", "Size", "DN", "NominalDiameter"], "format": None},
+        {"label": "Материал", "keys": ["Материал", "Material"], "format": None},
+    ],
+    "Оборудование": [
+        {"label": "Секция", "keys": ["Секция", "Section"], "format": None},
+        {"label": "Часть системы", "keys": ["Часть системы", "SystemPart", "PartOfSystem", "System"], "format": None},
+        {"label": "Тип", "keys": ["Тип", "EquipmentType", "Type"], "format": None},
+        {"label": "Мощность", "keys": ["Мощность", "Power", "PowerConsumption"], "format": {"decimals": 1}},
+        {"label": "Производительность", "keys": ["Производительность", "Performance", "FlowRate"], "format": {"decimals": 1}},
+    ],
+    "Сантехнический прибор": [
+        {"label": "Секция", "keys": ["Секция", "Section"], "format": None},
+        {"label": "Вид", "keys": ["Вид", "Type", "FixtureType"], "format": None},
+        {"label": "Подключение", "keys": ["Подключение", "Connection", "ConnectionType"], "format": None},
+    ],
+    "Изоляция рулонная": [
+        {"label": "Толщина", "keys": ["Толщина", "Thickness"], "format": {"decimals": 2}},
+        {"label": "Материал", "keys": ["Материал", "Material"], "format": None},
+        {"label": "Тип", "keys": ["Тип", "Type", "InsulationType"], "format": None},
+    ],
+    "Изоляция трубчатая": [
+        {"label": "Толщина", "keys": ["Толщина", "Thickness"], "format": {"decimals": 2}},
+        {"label": "Материал", "keys": ["Материал", "Material"], "format": None},
+        {"label": "Тип", "keys": ["Тип", "Type", "InsulationType"], "format": None},
+    ],
+    "Невалидируемое семейство": [],
+}
+
+
+async def list_project_categories(project_id: str) -> list:
+    async with async_session() as session:
+        from sqlalchemy import select
+        result = await session.execute(
+            select(ProjectCategory)
+            .where(ProjectCategory.project_id == project_id)
+            .order_by(ProjectCategory.display_order)
+        )
+        cats = result.scalars().all()
+        if not cats:
+            return [
+                {"name": name, "order": i, "columns": DEFAULT_COLUMNS.get(name, [])}
+                for i, name in enumerate(DEFAULT_CATEGORIES)
+            ]
+        return [
+            {
+                "name": c.name,
+                "order": c.display_order,
+                "columns": c.columns_config if c.columns_config else DEFAULT_COLUMNS.get(c.name, []),
+            }
+            for c in cats
+        ]
+
+
+async def save_project_categories(project_id: str, categories: list) -> list:
+    async with async_session() as session:
+        from sqlalchemy import delete, select
+        import json
+
+        # Get old category names from DB
+        old_result = await session.execute(
+            select(ProjectCategory)
+            .where(ProjectCategory.project_id == project_id)
+            .order_by(ProjectCategory.display_order)
+        )
+        old_cats = old_result.scalars().all()
+        old_names = [c.name for c in old_cats]
+
+        # Build new names list and rename map (by position)
+        rename_map = {}
+        new_entries = []
+        for i, cat in enumerate(categories):
+            name = cat if isinstance(cat, str) else cat.get("name")
+            if not name:
+                continue
+            columns = cat.get("columns") if isinstance(cat, dict) else None
+            new_entries.append({"name": name, "columns": columns})
+            if i < len(old_names) and old_names[i] != name:
+                rename_map[old_names[i]] = name
+
+        # If no saved categories yet, compare against defaults
+        if not old_names:
+            for i, entry in enumerate(new_entries):
+                if i < len(DEFAULT_CATEGORIES) and DEFAULT_CATEGORIES[i] != entry["name"]:
+                    rename_map[DEFAULT_CATEGORIES[i]] = entry["name"]
+
+        # Delete old and insert new category records
+        await session.execute(
+            delete(ProjectCategory).where(ProjectCategory.project_id == project_id)
+        )
+        for i, entry in enumerate(new_entries):
+            session.add(ProjectCategory(
+                project_id=project_id,
+                name=entry["name"],
+                display_order=i,
+                columns_config=entry["columns"],
+            ))
+
+        # If there are renames, update element raw_psets_jsonb across the project
+        if rename_map:
+            # Find all model versions for this project
+            mv_result = await session.execute(
+                select(ModelVersion.id).where(ModelVersion.project_id == project_id)
+            )
+            mv_ids = [row[0] for row in mv_result.fetchall()]
+            if mv_ids:
+                from sqlalchemy import select as sel
+                elements = (await session.execute(
+                    sel(Element).where(Element.model_version_id.in_(mv_ids))
+                )).scalars().all()
+
+                for el in elements:
+                    changed = False
+                    rp = el.raw_psets_jsonb
+                    if rp and isinstance(rp, dict):
+                        for pset_name, props in rp.items():
+                            if isinstance(props, dict):
+                                for key, val in list(props.items()):
+                                    val_str = str(val).strip() if val else ""
+                                    if val_str in rename_map:
+                                        props[key] = rename_map[val_str]
+                                        changed = True
+                    if changed:
+                        el.raw_psets_jsonb = rp
+
+        await session.commit()
+        return await list_project_categories(project_id)
+
+
+# ── TZ (Technical Specification) ──────────────────────────────────
+
+
+async def get_project_tz(project_id: str) -> Optional[dict]:
+    async with async_session() as session:
+        from sqlalchemy import select
+        result = await session.execute(
+            select(Project).where(Project.id == project_id)
+        )
+        p = result.scalar_one_or_none()
+        if not p:
+            return None
+        return {
+            "tz_general": p.tz_general or "",
+            "tz_water_supply": p.tz_water_supply or "",
+            "tz_sewerage": p.tz_sewerage or "",
+            "tz_fire_fighting": p.tz_fire_fighting or "",
+            "tz_other": p.tz_other or "",
+            "tz_file_name": p.tz_file_name,
+            "tz_file_path": p.tz_file_path,
+            "tz_file_uploaded_at": p.tz_file_uploaded_at.isoformat() if p.tz_file_uploaded_at else None,
+        }
+
+
+async def update_project_tz(project_id: str, data: dict, source: str = "manual") -> Optional[dict]:
+    async with async_session() as session:
+        from sqlalchemy import select, func
+        result = await session.execute(
+            select(Project).where(Project.id == project_id)
+        )
+        p = result.scalar_one_or_none()
+        if not p:
+            return None
+
+        for field in ("tz_general", "tz_water_supply", "tz_sewerage", "tz_fire_fighting", "tz_other",
+                      "tz_file_name", "tz_file_path"):
+            if field in data:
+                setattr(p, field, data[field])
+        if "tz_file_uploaded_at" in data:
+            p.tz_file_uploaded_at = data["tz_file_uploaded_at"]
+
+        await session.commit()
+        await session.refresh(p)
+
+        # Create version snapshot
+        version_result = await session.execute(
+            select(func.count()).select_from(TzVersion).where(TzVersion.project_id == project_id)
+        )
+        ver_num = (version_result.scalar() or 0) + 1
+        tz_data = {
+            "tz_general": p.tz_general or "",
+            "tz_water_supply": p.tz_water_supply or "",
+            "tz_sewerage": p.tz_sewerage or "",
+            "tz_fire_fighting": p.tz_fire_fighting or "",
+            "tz_other": p.tz_other or "",
+        }
+        session.add(TzVersion(
+            project_id=project_id,
+            version=ver_num,
+            data_jsonb=tz_data,
+            source=source,
+            file_name=p.tz_file_name,
+        ))
+        await session.commit()
+
+        return {
+            "tz_general": p.tz_general or "",
+            "tz_water_supply": p.tz_water_supply or "",
+            "tz_sewerage": p.tz_sewerage or "",
+            "tz_fire_fighting": p.tz_fire_fighting or "",
+            "tz_other": p.tz_other or "",
+            "tz_file_name": p.tz_file_name,
+        }
+
+
+async def get_tz_history(project_id: str) -> list:
+    async with async_session() as session:
+        from sqlalchemy import select
+        result = await session.execute(
+            select(TzVersion)
+            .where(TzVersion.project_id == project_id)
+            .order_by(TzVersion.version.desc())
+            .limit(50)
+        )
+        versions = result.scalars().all()
+        return [
+            {
+                "id": v.id,
+                "version": v.version,
+                "source": v.source,
+                "file_name": v.file_name,
+                "created_at": v.created_at.isoformat() if v.created_at else None,
+                "data": v.data_jsonb,
+            }
+            for v in versions
         ]

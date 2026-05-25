@@ -11,6 +11,8 @@ namespace LynxRevitPlugin
     [Transaction(TransactionMode.Manual)]
     public class ExportIfcCommand : IExternalCommand
     {
+        private static bool _isUploading;
+
         public Result Execute(
             ExternalCommandData commandData,
             ref string message,
@@ -18,6 +20,12 @@ namespace LynxRevitPlugin
         {
             UIDocument uidoc = commandData.Application.ActiveUIDocument;
             Document doc = uidoc.Document;
+
+            if (_isUploading)
+            {
+                TaskDialog.Show("Lynx", "Выгрузка уже выполняется. Дождитесь завершения.");
+                return Result.Failed;
+            }
 
             var settings = SettingsForm.LoadSettingsData();
 
@@ -41,36 +49,40 @@ namespace LynxRevitPlugin
                 string ifcFileName = $"{doc.Title}_{DateTime.Now:yyyyMMdd_HHmmss}.ifc";
                 string ifcPath = Path.Combine(exportFolder, ifcFileName);
 
-                using (Transaction t = new Transaction(doc, "IFC Export"))
-                {
-                    t.Start();
-                    ExportIfc(doc, exportFolder, ifcFileName);
-                    t.Commit();
-                }
+                ExportIfc(doc, exportFolder, ifcFileName);
 
-                TaskDialog.Show("Lynx", "Экспорт завершён.\nОтправка на сервер... (можно закрыть)");
+                _isUploading = true;
 
-                var resultTask = UploadIfcToServerAsync(ifcPath, settings, doc);
-                resultTask.Wait();
-                var result = resultTask.Result;
-
-                if (result.Success)
+                Task.Run(async () =>
                 {
-                    TaskDialog.Show("Lynx", 
-                        $"Модель отправлена.\n\n" +
-                        $"Model ID: {result.ModelVersionId}\n" +
-                        $"Status: {result.Status}");
-                }
-                else
-                {
-                    TaskDialog.Show("Lynx", $"Ошибка: {result.ErrorMessage}");
-                    return Result.Failed;
-                }
+                    try
+                    {
+                        var result = await UploadIfcToServerAsync(ifcPath, settings, doc);
+                        var evt = new ShowUploadResultEvent();
+                        if (result.Success)
+                        {
+                            evt.Message =
+                                $"Модель отправлена.\n\n" +
+                                $"Model ID: {result.ModelVersionId}\n" +
+                                $"Status: {result.Status}";
+                        }
+                        else
+                        {
+                            evt.Message = $"Ошибка: {result.ErrorMessage}";
+                        }
+                        ExternalEvent.Create(evt).Raise();
+                    }
+                    finally
+                    {
+                        _isUploading = false;
+                    }
+                });
 
                 return Result.Succeeded;
             }
             catch (Exception ex)
             {
+                _isUploading = false;
                 TaskDialog.Show("Lynx", $"Ошибка: {ex.Message}");
                 message = ex.Message;
                 return Result.Failed;
@@ -167,5 +179,17 @@ namespace LynxRevitPlugin
         public string ModelVersionId { get; set; }
         public string Status { get; set; }
         public string ErrorMessage { get; set; }
+    }
+
+    public class ShowUploadResultEvent : IExternalEventHandler
+    {
+        public string Message { get; set; }
+
+        public void Execute(UIApplication app)
+        {
+            TaskDialog.Show("Lynx", Message);
+        }
+
+        public string GetName() => "Lynx Upload Result";
     }
 }
