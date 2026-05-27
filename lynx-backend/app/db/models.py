@@ -222,6 +222,132 @@ async def init_db():
                         {"ver": ver, "id": row[0]}
                     )
                     project_counters[pid] = ver + 1
+            # Backfill size_filled for existing elements from raw_psets_jsonb
+            import json as _json
+            _size_keys = ["NominalDiameter", "Diameter", "DN",
+                          "BRU_Габарит элемента", "Bru_Габарит элемента",
+                          "Размер", "Габарит", "DN_OutsideDiameter", "OD"]
+            rows = conn.execute(
+                sa.text("SELECT e.id, e.normalized_jsonb, e.raw_psets_jsonb FROM elements e WHERE e.normalized_jsonb IS NOT NULL")
+            ).fetchall()
+            for eid, nb, rp in rows:
+                try:
+                    nb_parsed = _json.loads(nb) if isinstance(nb, str) else nb
+                except Exception:
+                    nb_parsed = nb
+                if not isinstance(nb_parsed, dict):
+                    continue
+                # Re-evaluate size_filled from raw_psets (override previous)
+                nb_parsed.pop("size_filled", None)
+                # Determine size_filled from raw_psets
+                sf = False
+                if rp:
+                    try:
+                        rp_parsed = _json.loads(rp) if isinstance(rp, str) else rp
+                    except Exception:
+                        rp_parsed = rp
+                    if isinstance(rp_parsed, dict):
+                        for _pn, _props in rp_parsed.items():
+                            if isinstance(_props, dict):
+                                for _k in _size_keys:
+                                    if _k in _props:
+                                        _v = _props[_k]
+                                        if _v is not None and str(_v).strip():
+                                            sf = True
+                                            break
+                            if sf:
+                                break
+                if sf:
+                    nb_parsed["size_filled"] = True
+                    conn.execute(
+                        sa.text("UPDATE elements SET normalized_jsonb = :nb WHERE id = :id"),
+                        {"nb": _json.dumps(nb_parsed, ensure_ascii=False), "id": eid}
+                    )
+            # Backfill diameter_mm from raw_psets_jsonb for existing elements
+            _diam_keys = ["NominalDiameter", "Diameter", "DN",
+                          "BRU_Габарит элемента", "Bru_Габарит элемента",
+                          "DN_OutsideDiameter", "OD"]
+            rows = conn.execute(
+                sa.text("SELECT e.id, e.normalized_jsonb, e.raw_psets_jsonb FROM elements e WHERE e.raw_psets_jsonb IS NOT NULL")
+            ).fetchall()
+            for eid, nb, rp in rows:
+                if rp is None:
+                    continue
+                try:
+                    nb_parsed = _json.loads(nb) if isinstance(nb, str) else nb
+                except Exception:
+                    continue
+                if not isinstance(nb_parsed, dict):
+                    continue
+                if nb_parsed.get("diameter_mm") is not None:
+                    continue
+                try:
+                    rp_parsed = _json.loads(rp) if isinstance(rp, str) else rp
+                except Exception:
+                    continue
+                if not isinstance(rp_parsed, dict):
+                    continue
+                for _pn, _props in rp_parsed.items():
+                    if isinstance(_props, dict):
+                        for _k in _diam_keys:
+                            _v = _props.get(_k)
+                            if _v is not None and str(_v).strip():
+                                try:
+                                    fv = float(_v)
+                                    nb_parsed["diameter_mm"] = fv
+                                    conn.execute(
+                                        sa.text("UPDATE elements SET normalized_jsonb = :nb WHERE id = :id"),
+                                        {"nb": _json.dumps(nb_parsed, ensure_ascii=False), "id": eid}
+                                    )
+                                except (ValueError, TypeError):
+                                    pass
+                                break
+                    if nb_parsed.get("diameter_mm") is not None:
+                        break
+            # Backfill storey_name / system_name from raw_psets_jsonb for existing elements
+            _storey_keys = ["ADSK_Этаж", "Этаж", "Storey", "Level"]
+            _system_keys = ["BRU_Система", "Bru_Система", "Система", "System"]
+            rows = conn.execute(
+                sa.text("SELECT id, raw_psets_jsonb, storey_name, system_name FROM elements WHERE raw_psets_jsonb IS NOT NULL")
+            ).fetchall()
+            for eid, rp, cur_storey, cur_system in rows:
+                if rp is None:
+                    continue
+                try:
+                    parsed = _json.loads(rp) if isinstance(rp, str) else rp
+                except Exception:
+                    continue
+                if not isinstance(parsed, dict):
+                    continue
+                # backfill storey_name
+                new_storey = cur_storey
+                if not new_storey:
+                    for _pn, _props in parsed.items():
+                        if isinstance(_props, dict):
+                            for _k in _storey_keys:
+                                _v = _props.get(_k)
+                                if _v and str(_v).strip():
+                                    new_storey = str(_v).strip()
+                                    break
+                        if new_storey:
+                            break
+                # backfill system_name
+                new_system = cur_system
+                if not new_system:
+                    for _pn, _props in parsed.items():
+                        if isinstance(_props, dict):
+                            for _k in _system_keys:
+                                _v = _props.get(_k)
+                                if _v and str(_v).strip():
+                                    new_system = str(_v).strip()
+                                    break
+                        if new_system:
+                            break
+                if new_storey != cur_storey or new_system != cur_system:
+                    conn.execute(
+                        sa.text("UPDATE elements SET storey_name = :s, system_name = :sys WHERE id = :id"),
+                        {"s": new_storey, "sys": new_system, "id": eid}
+                    )
         await conn.run_sync(_migrate)
 
 
@@ -531,8 +657,8 @@ DEFAULT_COLUMNS = {
         {"label": "Часть системы", "keys": ["BRU_ЧастьСистемы"], "group": "position", "format": None},
         {"label": "Система", "keys": ["BRU_Система"], "group": "position", "format": None},
         {"label": "Этаж", "keys": ["ADSK_Этаж", "Этаж", "Storey", "Level"], "group": "position", "format": None},
-        {"label": "CUBE_Сокращение", "keys": ["CUBE_Сокращение"], "group": "position", "format": None},
-        {"label": "Вид", "keys": ["Вид", "Type", "PipeType"], "group": "structural", "format": None},
+        {"label": "CUBE_Сокращение", "keys": ["CUBE_Сокращение для системы", "Сокращение для системы"], "group": "position", "format": None},
+        {"label": "Вид", "keys": ["BRU_Вид", "Bru_Вид", "Вид", "Type", "PipeType"], "group": "structural", "format": None},
         {"label": "Размер", "keys": ["Размер", "Size", "DN", "NominalDiameter"], "group": "structural", "format": None},
         {"label": "Толщина стенки", "keys": ["Толщина стенки", "WallThickness"], "group": "structural", "format": {"decimals": 2}},
         {"label": "Длина, мм", "keys": ["Длина", "Length"], "group": "structural", "format": {"decimals": 1}},
@@ -542,8 +668,8 @@ DEFAULT_COLUMNS = {
         {"label": "Часть системы", "keys": ["BRU_ЧастьСистемы"], "group": "position", "format": None},
         {"label": "Система", "keys": ["BRU_Система"], "group": "position", "format": None},
         {"label": "Этаж", "keys": ["ADSK_Этаж", "Этаж", "Storey", "Level"], "group": "position", "format": None},
-        {"label": "CUBE_Сокращение", "keys": ["CUBE_Сокращение"], "group": "position", "format": None},
-        {"label": "Вид", "keys": ["Вид", "Type", "PipeType"], "group": "structural", "format": None},
+        {"label": "CUBE_Сокращение", "keys": ["CUBE_Сокращение для системы", "Сокращение для системы"], "group": "position", "format": None},
+        {"label": "Вид", "keys": ["BRU_Вид", "Bru_Вид", "Вид", "Type", "PipeType"], "group": "structural", "format": None},
         {"label": "Размер", "keys": ["Размер", "Size", "DN", "NominalDiameter"], "group": "structural", "format": None},
         {"label": "Толщина стенки", "keys": ["Толщина стенки", "WallThickness"], "group": "structural", "format": {"decimals": 2}},
         {"label": "Длина, мм", "keys": ["Длина", "Length"], "group": "structural", "format": {"decimals": 1}},
@@ -553,74 +679,71 @@ DEFAULT_COLUMNS = {
         {"label": "Часть системы", "keys": ["BRU_ЧастьСистемы"], "group": "position", "format": None},
         {"label": "Система", "keys": ["BRU_Система"], "group": "position", "format": None},
         {"label": "Этаж", "keys": ["ADSK_Этаж", "Этаж", "Storey", "Level"], "group": "position", "format": None},
-        {"label": "CUBE_Сокращение", "keys": ["CUBE_Сокращение"], "group": "position", "format": None},
+        {"label": "CUBE_Сокращение", "keys": ["CUBE_Сокращение для системы", "Сокращение для системы"], "group": "position", "format": None},
         {"label": "Тип", "keys": ["BRU_Тип", "Bru_Тип", "Тип", "Type"], "group": "structural", "format": None},
         {"label": "Вид", "keys": ["BRU_Вид", "Bru_Вид", "Вид", "Type", "FittingType", "ValveType"], "group": "structural", "format": None},
         {"label": "Размер", "keys": ["BRU_Габарит элемента", "Bru_Габарит элемента", "Размер", "Size", "DN", "NominalDiameter"], "group": "structural", "format": None},
-        {"label": "Материал", "keys": ["Материал", "Material"], "group": "structural", "format": None},
+
     ],
     "Полимерная соединительная деталь трубы": [
         {"label": "Секция", "keys": ["ADSK_Номер секции", "Секция", "Section"], "group": "position", "format": None},
         {"label": "Часть системы", "keys": ["BRU_ЧастьСистемы"], "group": "position", "format": None},
         {"label": "Система", "keys": ["BRU_Система"], "group": "position", "format": None},
         {"label": "Этаж", "keys": ["ADSK_Этаж", "Этаж", "Storey", "Level"], "group": "position", "format": None},
-        {"label": "CUBE_Сокращение", "keys": ["CUBE_Сокращение"], "group": "position", "format": None},
+        {"label": "CUBE_Сокращение", "keys": ["CUBE_Сокращение для системы", "Сокращение для системы"], "group": "position", "format": None},
         {"label": "Тип", "keys": ["BRU_Тип", "Bru_Тип", "Тип", "Type"], "group": "structural", "format": None},
         {"label": "Вид", "keys": ["BRU_Вид", "Bru_Вид", "Вид", "Type", "FittingType", "ValveType"], "group": "structural", "format": None},
         {"label": "Размер", "keys": ["BRU_Габарит элемента", "Bru_Габарит элемента", "Размер", "Size", "DN", "NominalDiameter"], "group": "structural", "format": None},
-        {"label": "Материал", "keys": ["Материал", "Material"], "group": "structural", "format": None},
+
     ],
     "Арматура труб": [
         {"label": "Секция", "keys": ["ADSK_Номер секции", "Секция", "Section"], "group": "position", "format": None},
         {"label": "Часть системы", "keys": ["BRU_ЧастьСистемы"], "group": "position", "format": None},
         {"label": "Система", "keys": ["BRU_Система"], "group": "position", "format": None},
         {"label": "Этаж", "keys": ["ADSK_Этаж", "Этаж", "Storey", "Level"], "group": "position", "format": None},
-        {"label": "CUBE_Сокращение", "keys": ["CUBE_Сокращение"], "group": "position", "format": None},
+        {"label": "CUBE_Сокращение", "keys": ["CUBE_Сокращение для системы", "Сокращение для системы"], "group": "position", "format": None},
         {"label": "Тип", "keys": ["BRU_Тип", "Bru_Тип", "Тип", "Type"], "group": "structural", "format": None},
         {"label": "Вид", "keys": ["BRU_Вид", "Bru_Вид", "Вид", "Type", "ValveType"], "group": "structural", "format": None},
         {"label": "Размер", "keys": ["BRU_Габарит элемента", "Bru_Габарит элемента", "Размер", "Size", "DN", "NominalDiameter"], "group": "structural", "format": None},
-        {"label": "Материал", "keys": ["Материал", "Material"], "group": "structural", "format": None},
+
     ],
     "Арматура": [
         {"label": "Секция", "keys": ["ADSK_Номер секции", "Секция", "Section"], "group": "position", "format": None},
         {"label": "Часть системы", "keys": ["BRU_ЧастьСистемы"], "group": "position", "format": None},
         {"label": "Система", "keys": ["BRU_Система"], "group": "position", "format": None},
         {"label": "Этаж", "keys": ["ADSK_Этаж", "Этаж", "Storey", "Level"], "group": "position", "format": None},
-        {"label": "CUBE_Сокращение", "keys": ["CUBE_Сокращение"], "group": "position", "format": None},
+        {"label": "CUBE_Сокращение", "keys": ["CUBE_Сокращение для системы", "Сокращение для системы"], "group": "position", "format": None},
         {"label": "Тип", "keys": ["BRU_Тип", "Bru_Тип", "Тип", "Type"], "group": "structural", "format": None},
         {"label": "Вид", "keys": ["BRU_Вид", "Bru_Вид", "Вид", "Type", "ValveType"], "group": "structural", "format": None},
         {"label": "Размер", "keys": ["BRU_Габарит элемента", "Bru_Габарит элемента", "Размер", "Size", "DN", "NominalDiameter"], "group": "structural", "format": None},
-        {"label": "Материал", "keys": ["Материал", "Material"], "group": "structural", "format": None},
+
     ],
     "Оборудование": [
         {"label": "Секция", "keys": ["ADSK_Номер секции", "Секция", "Section"], "group": "position", "format": None},
         {"label": "Часть системы", "keys": ["BRU_ЧастьСистемы"], "group": "position", "format": None},
         {"label": "Система", "keys": ["BRU_Система"], "group": "position", "format": None},
         {"label": "Этаж", "keys": ["ADSK_Этаж", "Этаж", "Storey", "Level"], "group": "position", "format": None},
-        {"label": "CUBE_Сокращение", "keys": ["CUBE_Сокращение"], "group": "position", "format": None},
+        {"label": "CUBE_Сокращение", "keys": ["CUBE_Сокращение для системы", "Сокращение для системы"], "group": "position", "format": None},
         {"label": "Тип", "keys": ["BRU_Тип", "Bru_Тип", "Тип", "EquipmentType", "Type"], "group": "structural", "format": None},
         {"label": "Вид", "keys": ["BRU_Вид", "Bru_Вид", "Вид", "Type"], "group": "structural", "format": None},
         {"label": "Размер", "keys": ["BRU_Габарит элемента", "Bru_Габарит элемента", "Размер", "Size", "DN"], "group": "structural", "format": None},
-        {"label": "Мощность", "keys": ["Мощность", "Power", "PowerConsumption"], "group": "structural", "format": {"decimals": 1}},
-        {"label": "Производительность", "keys": ["Производительность", "Performance", "FlowRate"], "group": "structural", "format": {"decimals": 1}},
     ],
     "Сантехнический прибор": [
         {"label": "Секция", "keys": ["ADSK_Номер секции", "Секция", "Section"], "group": "position", "format": None},
         {"label": "Часть системы", "keys": ["BRU_ЧастьСистемы"], "group": "position", "format": None},
         {"label": "Система", "keys": ["BRU_Система"], "group": "position", "format": None},
         {"label": "Этаж", "keys": ["ADSK_Этаж", "Этаж", "Storey", "Level"], "group": "position", "format": None},
-        {"label": "CUBE_Сокращение", "keys": ["CUBE_Сокращение"], "group": "position", "format": None},
+        {"label": "CUBE_Сокращение", "keys": ["CUBE_Сокращение для системы", "Сокращение для системы"], "group": "position", "format": None},
         {"label": "Вид", "keys": ["BRU_Вид", "Bru_Вид", "Вид", "Type", "FixtureType"], "group": "structural", "format": None},
-        {"label": "Подключение", "keys": ["Подключение", "Connection", "ConnectionType"], "group": "structural", "format": None},
     ],
     "Изоляция рулонная": [
         {"label": "Секция", "keys": ["ADSK_Номер секции", "Секция", "Section"], "group": "position", "format": None},
         {"label": "Часть системы", "keys": ["BRU_ЧастьСистемы"], "group": "position", "format": None},
         {"label": "Система", "keys": ["BRU_Система"], "group": "position", "format": None},
         {"label": "Этаж", "keys": ["ADSK_Этаж", "Этаж", "Storey", "Level"], "group": "position", "format": None},
-        {"label": "CUBE_Сокращение", "keys": ["CUBE_Сокращение"], "group": "position", "format": None},
+        {"label": "CUBE_Сокращение", "keys": ["CUBE_Сокращение для системы", "Сокращение для системы"], "group": "position", "format": None},
         {"label": "Толщина", "keys": ["Толщина", "Thickness"], "group": "structural", "format": {"decimals": 2}},
-        {"label": "Материал", "keys": ["Материал", "Material"], "group": "structural", "format": None},
+
         {"label": "Тип", "keys": ["BRU_Тип", "Bru_Тип", "Тип", "Type", "InsulationType"], "group": "structural", "format": None},
     ],
     "Изоляция трубчатая": [
@@ -628,9 +751,9 @@ DEFAULT_COLUMNS = {
         {"label": "Часть системы", "keys": ["BRU_ЧастьСистемы"], "group": "position", "format": None},
         {"label": "Система", "keys": ["BRU_Система"], "group": "position", "format": None},
         {"label": "Этаж", "keys": ["ADSK_Этаж", "Этаж", "Storey", "Level"], "group": "position", "format": None},
-        {"label": "CUBE_Сокращение", "keys": ["CUBE_Сокращение"], "group": "position", "format": None},
+        {"label": "CUBE_Сокращение", "keys": ["CUBE_Сокращение для системы", "Сокращение для системы"], "group": "position", "format": None},
         {"label": "Толщина", "keys": ["Толщина", "Thickness"], "group": "structural", "format": {"decimals": 2}},
-        {"label": "Материал", "keys": ["Материал", "Material"], "group": "structural", "format": None},
+
         {"label": "Тип", "keys": ["BRU_Тип", "Bru_Тип", "Тип", "Type", "InsulationType"], "group": "structural", "format": None},
     ],
     "Невалидируемое семейство": [],

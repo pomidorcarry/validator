@@ -186,6 +186,20 @@ async def get_model_elements(model_version_id: str):
     return {"elements": elements, "count": len(elements)}
 
 
+@app.post(f"{settings.api_prefix}/models/{{model_version_id}}/reprocess-rules")
+async def reprocess_rules(model_version_id: str):
+    from .services.rule_engine import run_rules
+    from .db.models import async_session, Issue
+    from sqlalchemy import delete
+    
+    async with async_session() as session:
+        await session.execute(delete(Issue).where(Issue.model_version_id == model_version_id))
+        await session.commit()
+    
+    count = await run_rules(model_version_id)
+    return {"model_version_id": model_version_id, "issues_created": count}
+
+
 @app.get(f"{settings.api_prefix}/models/{{model_version_id}}/ifc")
 async def get_model_ifc(model_version_id: str):
     from pathlib import Path

@@ -18,38 +18,41 @@ MVP_CLASSES = [
 ]
 
 
-def extract_diameter_from_psets(psets: dict) -> Optional[float]:
-    """Извлечение диаметра из pset свойств."""
+def extract_diameter_from_psets(psets: dict) -> tuple[Optional[float], bool]:
+    """Извлечение диаметра из pset свойств.
+    Returns (numeric_diameter_mm_or_None, is_any_size_filled)."""
     search_keys = [
         "NominalDiameter",
-        "Reference",
         "Diameter",
-        "Size",
         "DN",
         "BRU_Габарит элемента",
         "Bru_Габарит элемента",
+        "DN_OutsideDiameter",
+        "OD",
     ]
     
+    has_any_value = False
     for pset_name, pset_data in psets.items():
         if not isinstance(pset_data, dict):
             continue
         for key in search_keys:
             if key in pset_data:
                 val = pset_data[key]
-                if val is not None:
+                if val is not None and str(val).strip():
+                    has_any_value = True
                     try:
-                        return float(val)
+                        return float(val), True
                     except (ValueError, TypeError):
                         pass
     
-    return None
+    return None, has_any_value
 
 
 def normalize_element(e, model, scale_to_mm: float = 1000.0) -> dict:
     """Нормализация одного элемента."""
     psets = el_util.get_psets(e)
     
-    diameter_val = extract_diameter_from_psets(psets)
+    diameter_val, size_filled = extract_diameter_from_psets(psets)
     diameter_mm = None
     if diameter_val is not None:
         diameter_mm = diameter_val * scale_to_mm
@@ -86,6 +89,17 @@ def normalize_element(e, model, scale_to_mm: float = 1000.0) -> dict:
                         system = assoc.RelatingGroup.Name
     except:
         pass
+    # 2. Fallback to BRU_Система and common keys from psets
+    if not system and psets:
+        for pset_name, props in psets.items():
+            if isinstance(props, dict):
+                for key in ["BRU_Система", "Bru_Система", "Система", "System"]:
+                    val = props.get(key)
+                    if val and str(val).strip():
+                        system = str(val).strip()
+                        break
+            if system:
+                break
     
     return {
         "global_id": e.GlobalId,
@@ -100,6 +114,7 @@ def normalize_element(e, model, scale_to_mm: float = 1000.0) -> dict:
         "raw_psets": psets,
         "canonical": {
             "diameter_mm": diameter_mm,
+            "size_filled": size_filled,
         },
 }
 

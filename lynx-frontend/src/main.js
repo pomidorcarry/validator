@@ -652,8 +652,8 @@ var DEFAULT_CATEGORY_COLUMNS = {
         { label: 'Часть системы', keys: ['BRU_ЧастьСистемы'], group: 'position' },
         { label: 'Система', keys: ['BRU_Система'], group: 'position' },
         { label: 'Этаж', keys: ['ADSK_Этаж', 'Этаж', 'Storey', 'Level'], group: 'position' },
-        { label: 'CUBE_Сокращение', keys: ['CUBE_Сокращение'], group: 'position' },
-        { label: 'Вид', keys: ['Вид', 'Type', 'PipeType'], group: 'structural' },
+        { label: 'CUBE_Сокращение', keys: ['CUBE_Сокращение для системы', 'Сокращение для системы'], group: 'position' },
+        { label: 'Вид', keys: ['BRU_Вид', 'Bru_Вид', 'Вид', 'Type', 'PipeType'], group: 'structural' },
         { label: 'Размер', keys: ['Размер', 'Size', 'DN', 'NominalDiameter'], group: 'structural' },
         { label: 'Толщина стенки', keys: ['Толщина стенки', 'WallThickness'], group: 'structural' },
         { label: 'Длина, мм', keys: ['Длина', 'Length'], group: 'structural' },
@@ -663,8 +663,8 @@ var DEFAULT_CATEGORY_COLUMNS = {
         { label: 'Часть системы', keys: ['BRU_ЧастьСистемы'], group: 'position' },
         { label: 'Система', keys: ['BRU_Система'], group: 'position' },
         { label: 'Этаж', keys: ['ADSK_Этаж', 'Этаж', 'Storey', 'Level'], group: 'position' },
-        { label: 'CUBE_Сокращение', keys: ['CUBE_Сокращение'], group: 'position' },
-        { label: 'Вид', keys: ['Вид', 'Type', 'PipeType'], group: 'structural' },
+        { label: 'CUBE_Сокращение', keys: ['CUBE_Сокращение для системы', 'Сокращение для системы'], group: 'position' },
+        { label: 'Вид', keys: ['BRU_Вид', 'Bru_Вид', 'Вид', 'Type', 'PipeType'], group: 'structural' },
         { label: 'Размер', keys: ['Размер', 'Size', 'DN', 'NominalDiameter'], group: 'structural' },
         { label: 'Толщина стенки', keys: ['Толщина стенки', 'WallThickness'], group: 'structural' },
         { label: 'Длина, мм', keys: ['Длина', 'Length'], group: 'structural' },
@@ -674,74 +674,71 @@ var DEFAULT_CATEGORY_COLUMNS = {
         { label: 'Часть системы', keys: ['BRU_ЧастьСистемы'], group: 'position' },
         { label: 'Система', keys: ['BRU_Система'], group: 'position' },
         { label: 'Этаж', keys: ['ADSK_Этаж', 'Этаж', 'Storey', 'Level'], group: 'position' },
-        { label: 'CUBE_Сокращение', keys: ['CUBE_Сокращение'], group: 'position' },
+        { label: 'CUBE_Сокращение', keys: ['CUBE_Сокращение для системы', 'Сокращение для системы'], group: 'position' },
         { label: 'Тип', keys: ['BRU_Тип', 'Bru_Тип', 'Тип', 'Type'], group: 'structural' },
         { label: 'Вид', keys: ['BRU_Вид', 'Bru_Вид', 'Вид', 'Type', 'FittingType', 'ValveType'], group: 'structural' },
         { label: 'Размер', keys: ['BRU_Габарит элемента', 'Bru_Габарит элемента', 'Размер', 'Size', 'DN', 'NominalDiameter'], group: 'structural' },
-        { label: 'Материал', keys: ['Материал', 'Material'], group: 'structural' },
+
     ],
     'Полимерная соединительная деталь трубы': [
         { label: 'Секция', keys: ['ADSK_Номер секции', 'Секция', 'Section'], group: 'position' },
         { label: 'Часть системы', keys: ['BRU_ЧастьСистемы'], group: 'position' },
         { label: 'Система', keys: ['BRU_Система'], group: 'position' },
         { label: 'Этаж', keys: ['ADSK_Этаж', 'Этаж', 'Storey', 'Level'], group: 'position' },
-        { label: 'CUBE_Сокращение', keys: ['CUBE_Сокращение'], group: 'position' },
+        { label: 'CUBE_Сокращение', keys: ['CUBE_Сокращение для системы', 'Сокращение для системы'], group: 'position' },
         { label: 'Тип', keys: ['BRU_Тип', 'Bru_Тип', 'Тип', 'Type'], group: 'structural' },
         { label: 'Вид', keys: ['BRU_Вид', 'Bru_Вид', 'Вид', 'Type', 'FittingType', 'ValveType'], group: 'structural' },
         { label: 'Размер', keys: ['BRU_Габарит элемента', 'Bru_Габарит элемента', 'Размер', 'Size', 'DN', 'NominalDiameter'], group: 'structural' },
-        { label: 'Материал', keys: ['Материал', 'Material'], group: 'structural' },
+
     ],
     'Арматура труб': [
         { label: 'Секция', keys: ['ADSK_Номер секции', 'Секция', 'Section'], group: 'position' },
         { label: 'Часть системы', keys: ['BRU_ЧастьСистемы'], group: 'position' },
         { label: 'Система', keys: ['BRU_Система'], group: 'position' },
         { label: 'Этаж', keys: ['ADSK_Этаж', 'Этаж', 'Storey', 'Level'], group: 'position' },
-        { label: 'CUBE_Сокращение', keys: ['CUBE_Сокращение'], group: 'position' },
+        { label: 'CUBE_Сокращение', keys: ['CUBE_Сокращение для системы', 'Сокращение для системы'], group: 'position' },
         { label: 'Тип', keys: ['BRU_Тип', 'Bru_Тип', 'Тип', 'Type'], group: 'structural' },
         { label: 'Вид', keys: ['BRU_Вид', 'Bru_Вид', 'Вид', 'Type', 'ValveType'], group: 'structural' },
         { label: 'Размер', keys: ['BRU_Габарит элемента', 'Bru_Габарит элемента', 'Размер', 'Size', 'DN', 'NominalDiameter'], group: 'structural' },
-        { label: 'Материал', keys: ['Материал', 'Material'], group: 'structural' },
+
     ],
     'Арматура': [
         { label: 'Секция', keys: ['ADSK_Номер секции', 'Секция', 'Section'], group: 'position' },
         { label: 'Часть системы', keys: ['BRU_ЧастьСистемы'], group: 'position' },
         { label: 'Система', keys: ['BRU_Система'], group: 'position' },
         { label: 'Этаж', keys: ['ADSK_Этаж', 'Этаж', 'Storey', 'Level'], group: 'position' },
-        { label: 'CUBE_Сокращение', keys: ['CUBE_Сокращение'], group: 'position' },
+        { label: 'CUBE_Сокращение', keys: ['CUBE_Сокращение для системы', 'Сокращение для системы'], group: 'position' },
         { label: 'Тип', keys: ['BRU_Тип', 'Bru_Тип', 'Тип', 'Type'], group: 'structural' },
         { label: 'Вид', keys: ['BRU_Вид', 'Bru_Вид', 'Вид', 'Type', 'ValveType'], group: 'structural' },
         { label: 'Размер', keys: ['BRU_Габарит элемента', 'Bru_Габарит элемента', 'Размер', 'Size', 'DN', 'NominalDiameter'], group: 'structural' },
-        { label: 'Материал', keys: ['Материал', 'Material'], group: 'structural' },
+
     ],
     'Оборудование': [
         { label: 'Секция', keys: ['ADSK_Номер секции', 'Секция', 'Section'], group: 'position' },
         { label: 'Часть системы', keys: ['BRU_ЧастьСистемы'], group: 'position' },
         { label: 'Система', keys: ['BRU_Система'], group: 'position' },
         { label: 'Этаж', keys: ['ADSK_Этаж', 'Этаж', 'Storey', 'Level'], group: 'position' },
-        { label: 'CUBE_Сокращение', keys: ['CUBE_Сокращение'], group: 'position' },
+        { label: 'CUBE_Сокращение', keys: ['CUBE_Сокращение для системы', 'Сокращение для системы'], group: 'position' },
         { label: 'Тип', keys: ['BRU_Тип', 'Bru_Тип', 'Тип', 'EquipmentType', 'Type'], group: 'structural' },
         { label: 'Вид', keys: ['BRU_Вид', 'Bru_Вид', 'Вид', 'Type'], group: 'structural' },
         { label: 'Размер', keys: ['BRU_Габарит элемента', 'Bru_Габарит элемента', 'Размер', 'Size', 'DN'], group: 'structural' },
-        { label: 'Мощность', keys: ['Мощность', 'Power', 'PowerConsumption'], group: 'structural' },
-        { label: 'Производительность', keys: ['Производительность', 'Performance', 'FlowRate'], group: 'structural' },
     ],
     'Сантехнический прибор': [
         { label: 'Секция', keys: ['ADSK_Номер секции', 'Секция', 'Section'], group: 'position' },
         { label: 'Часть системы', keys: ['BRU_ЧастьСистемы'], group: 'position' },
         { label: 'Система', keys: ['BRU_Система'], group: 'position' },
         { label: 'Этаж', keys: ['ADSK_Этаж', 'Этаж', 'Storey', 'Level'], group: 'position' },
-        { label: 'CUBE_Сокращение', keys: ['CUBE_Сокращение'], group: 'position' },
+        { label: 'CUBE_Сокращение', keys: ['CUBE_Сокращение для системы', 'Сокращение для системы'], group: 'position' },
         { label: 'Вид', keys: ['BRU_Вид', 'Bru_Вид', 'Вид', 'Type', 'FixtureType'], group: 'structural' },
-        { label: 'Подключение', keys: ['Подключение', 'Connection', 'ConnectionType'], group: 'structural' },
     ],
     'Изоляция рулонная': [
         { label: 'Секция', keys: ['ADSK_Номер секции', 'Секция', 'Section'], group: 'position' },
         { label: 'Часть системы', keys: ['BRU_ЧастьСистемы'], group: 'position' },
         { label: 'Система', keys: ['BRU_Система'], group: 'position' },
         { label: 'Этаж', keys: ['ADSK_Этаж', 'Этаж', 'Storey', 'Level'], group: 'position' },
-        { label: 'CUBE_Сокращение', keys: ['CUBE_Сокращение'], group: 'position' },
+        { label: 'CUBE_Сокращение', keys: ['CUBE_Сокращение для системы', 'Сокращение для системы'], group: 'position' },
         { label: 'Толщина', keys: ['Толщина', 'Thickness'], group: 'structural' },
-        { label: 'Материал', keys: ['Материал', 'Material'], group: 'structural' },
+
         { label: 'Тип', keys: ['BRU_Тип', 'Bru_Тип', 'Тип', 'Type', 'InsulationType'], group: 'structural' },
     ],
     'Изоляция трубчатая': [
@@ -749,9 +746,9 @@ var DEFAULT_CATEGORY_COLUMNS = {
         { label: 'Часть системы', keys: ['BRU_ЧастьСистемы'], group: 'position' },
         { label: 'Система', keys: ['BRU_Система'], group: 'position' },
         { label: 'Этаж', keys: ['ADSK_Этаж', 'Этаж', 'Storey', 'Level'], group: 'position' },
-        { label: 'CUBE_Сокращение', keys: ['CUBE_Сокращение'], group: 'position' },
+        { label: 'CUBE_Сокращение', keys: ['CUBE_Сокращение для системы', 'Сокращение для системы'], group: 'position' },
         { label: 'Толщина', keys: ['Толщина', 'Thickness'], group: 'structural' },
-        { label: 'Материал', keys: ['Материал', 'Material'], group: 'structural' },
+
         { label: 'Тип', keys: ['BRU_Тип', 'Bru_Тип', 'Тип', 'Type', 'InsulationType'], group: 'structural' },
     ],
 };
@@ -1056,8 +1053,9 @@ function tzRenderTable() {
     // When "Все", show a default set
     if (!tzActiveCategory) {
         activeCatCols = [
+            { label: 'Часть системы', keys: ['BRU_ЧастьСистемы', 'Bru_ЧастьСистемы', 'Часть системы', 'SystemPart'] },
+            { label: 'Система', keys: ['BRU_Система', 'Bru_Система', 'Система', 'System'] },
             { label: 'Этаж', keys: ['ADSK_Этаж', 'Этаж', 'Storey', 'Level'] },
-            { label: 'Система', keys: ['Система', 'System'] },
         ];
     }
 
@@ -1071,8 +1069,9 @@ function tzRenderTable() {
 
     var cols = tzActiveCategory && CATEGORIES.indexOf(tzActiveCategory) >= 0
         ? getColsForCategory(tzActiveCategory) : [
+            { label: 'Часть системы', keys: ['BRU_ЧастьСистемы', 'Bru_ЧастьСистемы', 'Часть системы', 'SystemPart'] },
+            { label: 'Система', keys: ['BRU_Система', 'Bru_Система', 'Система', 'System'] },
             { label: 'Этаж', keys: ['ADSK_Этаж', 'Этаж', 'Storey', 'Level'] },
-            { label: 'Система', keys: ['Система', 'System'] },
         ];
 
     container.innerHTML = filtered.map(function(e) {
