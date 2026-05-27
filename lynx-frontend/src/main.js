@@ -1553,6 +1553,75 @@ window.saveCategories = async function() {
     }
 };
 
+// ── AI Status ─────────────────────────────────────────────────
+
+async function checkAiStatus(fullCheck) {
+    var dot = document.getElementById('aiStatusDot');
+    var cfgEl = document.getElementById('aiStatusConfigured');
+    var respEl = document.getElementById('aiStatusResponsive');
+    var btn = document.getElementById('aiCheckBtn');
+
+    dot.className = 'dot checking';
+    cfgEl.textContent = 'Проверка...';
+    cfgEl.className = 'ai-popup-value checking';
+    respEl.textContent = '—';
+    respEl.className = 'ai-popup-value unknown';
+    if (btn) btn.disabled = true;
+
+    var errEl = document.getElementById('aiStatusError');
+
+    try {
+        var url = API_BASE + '/ai/status?check=' + (fullCheck ? 'true' : 'false');
+        var r = await fetch(url);
+        var data = await r.json();
+
+        cfgEl.textContent = data.configured ? '✅ Настроен' : '❌ Не настроен';
+        cfgEl.className = 'ai-popup-value ' + (data.configured ? 'ok' : 'fail');
+        dot.className = 'dot ' + (data.configured ? 'ok' : 'fail');
+
+        if (data.responsive === true) {
+            respEl.textContent = '✅ Отвечает';
+            respEl.className = 'ai-popup-value ok';
+            dot.className = 'dot ok';
+        } else if (data.responsive === false) {
+            respEl.textContent = '❌ ' + (data.error_detail || 'Не отвечает');
+            respEl.className = 'ai-popup-value fail';
+            dot.className = 'dot fail';
+        } else if (data.configured) {
+            respEl.textContent = '— (нажмите "Проверить")';
+            respEl.className = 'ai-popup-value unknown';
+            dot.className = 'dot ok';
+        }
+        if (errEl) errEl.style.display = 'none';
+    } catch (e) {
+        cfgEl.textContent = '⚠ Ошибка';
+        cfgEl.className = 'ai-popup-value fail';
+        respEl.textContent = '⚠ Нет связи';
+        respEl.className = 'ai-popup-value fail';
+        dot.className = 'dot fail';
+    }
+    if (btn) btn.disabled = false;
+}
+
+window.toggleAiPopup = function() {
+    var popup = document.getElementById('aiPopup');
+    var isOpen = popup.classList.contains('open');
+    popup.classList.toggle('open');
+    if (!isOpen) {
+        checkAiStatus(false);
+    }
+};
+
+document.addEventListener('click', function(e) {
+    var wrap = document.querySelector('.ai-status-wrap');
+    if (wrap && !wrap.contains(e.target)) {
+        var popup = document.getElementById('aiPopup');
+        if (popup) popup.classList.remove('open');
+    }
+});
+
+setTimeout(function() { checkAiStatus(false); }, 2000);
+
 // ── Theme switching ────────────────────────────────────────────
 
 var THEMES = {

@@ -264,6 +264,30 @@
         .tz-history-item:last-child { border-bottom: none; }
         .tz-history-source { padding: 1px 6px; border-radius: 4px; font-size: 11px; background: var(--bg); border: 1px solid var(--border); }
 
+        .ai-status-wrap { position: relative; display: inline-flex; align-items: center; }
+        .ai-status-btn { background: var(--bg); border: 1px solid var(--border); color: var(--text-secondary); width: 30px; height: 30px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 14px; cursor: pointer; transition: all 0.15s; }
+        .ai-status-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .ai-status-btn .dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; margin-left: 2px; }
+        .ai-status-btn .dot.unknown { background: var(--text-secondary); }
+        .ai-status-btn .dot.ok { background: #34d399; box-shadow: 0 0 6px #34d39966; }
+        .ai-status-btn .dot.fail { background: var(--error); box-shadow: 0 0 6px #ff6b6b66; }
+        .ai-status-btn .dot.checking { background: var(--warning); animation: pulse 1s infinite; }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+        .ai-popup { position: absolute; top: calc(100% + 8px); right: 0; width: 280px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); padding: 16px; z-index: 500; display: none; }
+        .ai-popup.open { display: block; }
+        .ai-popup-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+        .ai-popup-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; margin-bottom: 8px; }
+        .ai-popup-label { color: var(--text-secondary); }
+        .ai-popup-value { font-weight: 600; }
+        .ai-popup-value.ok { color: #34d399; }
+        .ai-popup-value.fail { color: var(--error); }
+        .ai-popup-value.unknown { color: var(--text-secondary); }
+        .ai-popup-value.checking { color: var(--warning); }
+        .ai-popup-btn { width: 100%; margin-top: 12px; padding: 8px; border-radius: 6px; font-size: 13px; font-weight: 600; border: 1px solid var(--border); background: var(--bg); color: var(--text); cursor: pointer; transition: border-color 0.15s; }
+        .ai-popup-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .ai-popup-btn:disabled { opacity: 0.5; cursor: default; }
+        .ai-popup-error { font-size: 12px; color: var(--error); margin-top: 4px; display: none; line-height: 1.4; }
     </style>
 </head>
 <body>
@@ -275,6 +299,24 @@
         <div class="header-spacer"></div>
         <div class="header-actions">
             <button class="btn btn-sm btn-theme" id="btnThemeToggle" onclick="toggleTheme()" title="Переключить тему"></button>
+            <div class="ai-status-wrap">
+                <button class="ai-status-btn" id="aiStatusBtn" onclick="toggleAiPopup()" title="Статус ИИ">
+                    🤖<span class="dot unknown" id="aiStatusDot"></span>
+                </button>
+                <div class="ai-popup" id="aiPopup">
+                    <div class="ai-popup-title">Статус ИИ-модуля</div>
+                    <div class="ai-popup-row">
+                        <span class="ai-popup-label">Конфигурация</span>
+                        <span class="ai-popup-value unknown" id="aiStatusConfigured">—</span>
+                    </div>
+                    <div class="ai-popup-row">
+                        <span class="ai-popup-label">Подключение</span>
+                        <span class="ai-popup-value unknown" id="aiStatusResponsive">—</span>
+                    </div>
+                    <div class="ai-popup-error" id="aiStatusError"></div>
+                    <button class="ai-popup-btn" id="aiCheckBtn" onclick="checkAiStatus(true)">🔄 Проверить</button>
+                </div>
+            </div>
         </div>
         <div class="header-actions">
             <select class="project-quick-select" id="projectQuickSelect" onchange="onQuickSelectProject(this.value)" style="display:none">
