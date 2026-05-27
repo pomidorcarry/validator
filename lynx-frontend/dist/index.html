@@ -244,6 +244,17 @@
         .tz-prop-val { font-size: 13px; }
         .tz-meta-grid { padding: 12px 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 
+        /* Pipeline tables */
+        .pipeline-tab { padding: 6px 14px; font-size: 13px; cursor: pointer; border-radius: 6px; color: var(--text-secondary); background: var(--bg); border: 1px solid var(--border); white-space: nowrap; }
+        .pipeline-tab:hover { color: var(--text); border-color: var(--accent); }
+        .pipeline-tab.active { color: var(--accent); border-color: var(--accent); background: var(--accent-light); }
+        .pipeline-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .pipeline-table th { text-align: left; padding: 8px 12px; background: var(--bg); color: var(--text-secondary); font-weight: 600; border-bottom: 1px solid var(--border); font-size: 12px; text-transform: uppercase; }
+        .pipeline-table td { padding: 6px 12px; border-bottom: 1px solid var(--border); }
+        .pipeline-table input { width: 100%; padding: 6px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: 13px; }
+        .pipeline-table input:focus { outline: none; border-color: var(--accent); }
+        .pipeline-section-label { font-size: 13px; font-weight: 600; margin-bottom: 8px; color: var(--text); }
+
         /* Data page tabs */
         .data-tabs { display: flex; gap: 4px; }
         .data-tab { padding: 6px 14px; font-size: 13px; cursor: pointer; border-radius: 6px; color: var(--text-secondary); background: var(--bg); border: 1px solid var(--border); white-space: nowrap; }
@@ -289,7 +300,7 @@
         .ai-popup-btn:disabled { opacity: 0.5; cursor: default; }
         .ai-popup-error { font-size: 12px; color: var(--error); margin-top: 4px; display: none; line-height: 1.4; }
     </style>
-  <script type="module" crossorigin src="/assets/index-D4kgq2vw.js"></script>
+  <script type="module" crossorigin src="/assets/index-7l_X0wEP.js"></script>
 </head>
 <body>
     <div class="header">
@@ -496,26 +507,70 @@
                         </div>
                     </div>
                     <div id="dataTzTab" class="data-scroll" style="flex:1;overflow-y:auto;padding:16px;display:none">
+                        <!-- File block -->
                         <div class="tz-file-block">
-                            <div class="tz-file-info" id="tzFileInfo">Файл не загружен</div>
+                            <div style="font-size:13px;font-weight:600;margin-bottom:8px">Файлы ТЗ</div>
+                            <div id="tzFileList" style="margin-bottom:12px;font-size:13px;color:var(--text-secondary)">Файлов нет</div>
                             <div class="tz-file-actions">
                                 <button class="btn" onclick="document.getElementById('tzFileInput').click()">📄 Загрузить PDF/Excel</button>
                                 <input type="file" id="tzFileInput" accept=".pdf,.xlsx,.xls" style="display:none" onchange="uploadTzFile(this.files[0])" />
-                                <button class="btn" id="btnParseTz" onclick="parseTzAi()">⚡ Распознать через ИИ</button>
-                                <button class="btn btn-outline" id="btnDownloadTz" onclick="downloadTzFile()" style="display:none">📥 Скачать оригинал</button>
+                                <button class="btn" id="btnParseTz" onclick="parseTzAi()" disabled>⚡ Распознать выбранный</button>
+                                <button class="btn btn-outline" id="btnDownloadTz" onclick="downloadTzFile()" style="display:none">📥 Скачать</button>
                             </div>
                         </div>
+
+                        <!-- Details about the object -->
+                        <div style="margin-bottom:20px">
+                            <div style="font-size:14px;font-weight:600;margin-bottom:12px">Данные об объекте</div>
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                                <div>
+                                    <label class="tz-field-label">Адрес объекта</label>
+                                    <input class="form-input" id="projectAddress" placeholder="г. Москва, ул. Строителей, д. 1" />
+                                </div>
+                                <div>
+                                    <label class="tz-field-label">Количество секций</label>
+                                    <input class="form-input" id="sectionsCount" placeholder="Напр. 3" />
+                                </div>
+                                <div>
+                                    <label class="tz-field-label">Количество этажей</label>
+                                    <input class="form-input" id="floorsCount" placeholder="Напр. 17" />
+                                </div>
+                                <div>
+                                    <label class="tz-field-label">Требования к BIM-модели</label>
+                                    <input class="form-input" id="bimRequirements" placeholder="LOD 300, IFC 2x3, классификатор..." />
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Pipeline systems -->
+                        <div style="margin-bottom:20px">
+                            <div style="font-size:14px;font-weight:600;margin-bottom:12px">Трубопроводные системы</div>
+                            <div class="pipeline-tabs" style="display:flex;gap:4px;margin-bottom:12px">
+                                <span class="pipeline-tab active" data-sys="water_supply" onclick="switchPipelineTab('water_supply')">🚰 Водоснабжение</span>
+                                <span class="pipeline-tab" data-sys="sewerage" onclick="switchPipelineTab('sewerage')">🧪 Водоотведение</span>
+                                <span class="pipeline-tab" data-sys="fire_fighting" onclick="switchPipelineTab('fire_fighting')">🔥 Пожаротушение</span>
+                            </div>
+                            <div id="pipelineTableWrap">
+                                <table class="pipeline-table" id="pipelineTable">
+                                    <thead><tr><th>Участок</th><th>Материал</th><th>Диаметр</th><th>Изоляция</th></tr></thead>
+                                    <tbody id="pipelineTbody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- TZ text fields -->
+                        <div style="font-size:14px;font-weight:600;margin-bottom:12px">Описание разделов ТЗ</div>
                         <div class="tz-fields">
                             <label class="tz-field-label">Общее описание</label>
                             <textarea class="form-textarea tz-field-input" id="tzGeneral" rows="4" placeholder="Общее описание проекта, цели, требования к BIM-модели"></textarea>
                             <label class="tz-field-label">Водоснабжение</label>
-                            <textarea class="form-textarea tz-field-input" id="tzWaterSupply" rows="4" placeholder="Требования к разделу водоснабжения"></textarea>
+                            <textarea class="form-textarea tz-field-input" id="tzWaterSupply" rows="3" placeholder="Требования к разделу водоснабжения"></textarea>
                             <label class="tz-field-label">Водоотведение</label>
-                            <textarea class="form-textarea tz-field-input" id="tzSewerage" rows="4" placeholder="Требования к разделу водоотведения и канализации"></textarea>
+                            <textarea class="form-textarea tz-field-input" id="tzSewerage" rows="3" placeholder="Требования к разделу водоотведения и канализации"></textarea>
                             <label class="tz-field-label">Пожаротушение</label>
-                            <textarea class="form-textarea tz-field-input" id="tzFireFighting" rows="4" placeholder="Требования к разделу пожаротушения"></textarea>
+                            <textarea class="form-textarea tz-field-input" id="tzFireFighting" rows="3" placeholder="Требования к разделу пожаротушения"></textarea>
                             <label class="tz-field-label">Прочие решения</label>
-                            <textarea class="form-textarea tz-field-input" id="tzOther" rows="4" placeholder="Прочие инженерные решения (отопление, вентиляция, электрика и т.д.)"></textarea>
+                            <textarea class="form-textarea tz-field-input" id="tzOther" rows="3" placeholder="Прочие инженерные решения (отопление, вентиляция, электрика и т.д.)"></textarea>
                         </div>
                         <details class="tz-history" style="margin-top:16px">
                             <summary style="cursor:pointer;color:var(--text-secondary);font-size:13px">История изменений</summary>
@@ -664,6 +719,23 @@
             <div class="modal-footer">
                 <button class="btn btn-outline" onclick="closeModal('bindModal')">Отмена</button>
                 <button class="btn btn-primary" onclick="confirmBindModel()">Привязать</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Preview AI Parse Result -->
+    <div class="modal-overlay" id="tzPreviewModal">
+        <div class="modal" style="width:90%;max-width:900px">
+            <div class="modal-header">
+                <h2>Предпросмотр распознанного ТЗ</h2>
+                <button class="modal-close" onclick="closeModal('tzPreviewModal')">✕</button>
+            </div>
+            <div class="modal-body" style="max-height:65vh;overflow-y:auto">
+                <div id="tzPreviewContent"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeModal('tzPreviewModal')">Отмена</button>
+                <button class="btn btn-primary" id="tzPreviewApplyBtn" onclick="applyTzPreview()">✅ Применить</button>
             </div>
         </div>
     </div>

@@ -6,7 +6,7 @@ import uuid
 from contextlib import asynccontextmanager
 
 from .core.config import settings
-from .db.models import init_db
+from .db.models import init_db, list_projects as _list_projects, get_project as _get_project
 
 
 @asynccontextmanager
@@ -389,8 +389,6 @@ async def update_project_tz(project_id: str, data: dict):
 
 @app.post(f"{settings.api_prefix}/projects/{{project_id}}/tz/upload", status_code=201)
 async def upload_tz_file(project_id: str, file: UploadFile = File(...)):
-    from .db.models import get_project_tz as _get_tz, update_project_tz as _update_tz
-    
     allowed = (".pdf", ".xlsx", ".xls")
     ext = Path(file.filename).suffix.lower() if file.filename else ""
     if ext not in allowed:
@@ -410,61 +408,120 @@ async def upload_tz_file(project_id: str, file: UploadFile = File(...)):
         content = await file.read()
         f.write(content)
     
-    now = datetime.utcnow()
-    await _update_tz(project_id, {
-        "tz_file_name": file.filename,
-        "tz_file_path": str(dst),
-        "tz_file_uploaded_at": now,
-    }, source="upload")
+    # Save metadata with original filename
+    import json as _json
+    meta_file = dst.with_name(dst.name + ".meta")
+    meta_file.write_text(_json.dumps({"original_name": file.filename}))
     
+    now = datetime.utcnow()
     return {
         "file_name": file.filename,
+        "stored_name": stored_name,
         "file_path": str(dst),
         "uploaded_at": now.isoformat(),
     }
 
 
+@app.get(f"{settings.api_prefix}/projects/{{project_id}}/tz/files")
+async def list_tz_files(project_id: str):
+    tz_dir = Path(settings.storage_path) / "tz" / project_id
+    if not tz_dir.exists():
+        return {"files": []}
+    
+    files = []
+    for f in sorted(tz_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
+        if f.is_file() and f.suffix.lower() in (".pdf", ".xlsx", ".xls"):
+            from datetime import datetime
+            mtime = datetime.fromtimestamp(f.stat().st_mtime)
+            # Extract original name from metadata file if exists
+            display_name = f.stem
+            meta_file = f.with_name(f.name + ".meta")
+            if meta_file.exists():
+                try:
+                    import json as _json
+                    meta = _json.loads(meta_file.read_text())
+                    display_name = meta.get("original_name", f.stem)
+                except Exception:
+                    pass
+            files.append({
+                "stored_name": f.name,
+                "display_name": display_name,
+                "size_bytes": f.stat().st_size,
+                "uploaded_at": mtime.isoformat(),
+            })
+    return {"files": files}
+
+
+@app.delete(f"{settings.api_prefix}/projects/{{project_id}}/tz/files")
+async def delete_tz_file(project_id: str, filename: str = ""):
+    if not filename:
+        raise HTTPException(status_code=400, detail="filename is required")
+    
+    tz_dir = Path(settings.storage_path) / "tz" / project_id
+    file_path = tz_dir / filename
+    meta_path = tz_dir / (filename + ".meta")
+    
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    file_path.unlink()
+    if meta_path.exists():
+        meta_path.unlink()
+    
+    return {"deleted": filename}
+
+
 @app.post(f"{settings.api_prefix}/projects/{{project_id}}/tz/parse")
-async def parse_tz_file(project_id: str):
-    from .db.models import get_project_tz as _get_tz, update_project_tz as _update_tz
+async def parse_tz_file(project_id: str, filename: str = ""):
     from .services.ai.tz_parser import extract_text_from_file, parse_tz_document
     
-    tz = await _get_tz(project_id)
-    if tz is None:
-        raise HTTPException(status_code=404, detail="Project not found")
+    tz_dir = Path(settings.storage_path) / "tz" / project_id
+    if not tz_dir.exists():
+        raise HTTPException(status_code=400, detail="No TZ files found for this project")
     
-    file_path = tz.get("tz_file_path")
-    if not file_path or not Path(file_path).exists():
-        raise HTTPException(status_code=400, detail="No TZ file uploaded")
+    if filename:
+        file_path = tz_dir / filename
+    else:
+        tz_files = sorted(tz_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)
+        tz_files = [f for f in tz_files if f.is_file() and f.suffix.lower() in (".pdf", ".xlsx", ".xls")]
+        if not tz_files:
+            raise HTTPException(status_code=400, detail="No TZ files found")
+        file_path = tz_files[0]
     
-    text = extract_text_from_file(file_path)
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="TZ file not found")
+    
+    text = extract_text_from_file(str(file_path))
     if not text.strip():
         raise HTTPException(status_code=400, detail="Could not extract text from file")
     
     parsed = await parse_tz_document(text)
-    result = await _update_tz(project_id, parsed, source="ai")
-    if result is None:
-        raise HTTPException(status_code=404, detail="Project not found")
-    return result
+    parsed["_source_file"] = file_path.name
+    return parsed
 
 
 @app.get(f"{settings.api_prefix}/projects/{{project_id}}/tz/file")
-async def download_tz_file(project_id: str):
-    from .db.models import get_project_tz as _get_tz
+async def download_tz_file(project_id: str, filename: str = ""):
     from fastapi.responses import FileResponse
     
-    tz = await _get_tz(project_id)
-    if tz is None:
-        raise HTTPException(status_code=404, detail="Project not found")
+    tz_dir = Path(settings.storage_path) / "tz" / project_id
+    if not tz_dir.exists():
+        raise HTTPException(status_code=404, detail="No TZ files found")
     
-    file_path = tz.get("tz_file_path")
-    if not file_path or not Path(file_path).exists():
+    if filename:
+        file_path = tz_dir / filename
+    else:
+        tz_files = sorted(tz_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)
+        tz_files = [f for f in tz_files if f.is_file() and f.suffix.lower() in (".pdf", ".xlsx", ".xls")]
+        if not tz_files:
+            raise HTTPException(status_code=404, detail="No TZ files found")
+        file_path = tz_files[0]
+    
+    if not file_path.exists():
         raise HTTPException(status_code=404, detail="TZ file not found")
     
-    return FileResponse(
-        path=file_path,
-        filename=tz.get("tz_file_name") or Path(file_path).name,
-    )
+    display_name = file_path.name[20:] if "_" in file_path.name and len(file_path.name) > 20 else file_path.name
+    return FileResponse(path=str(file_path), filename=display_name)
 
 
 @app.get(f"{settings.api_prefix}/projects/{{project_id}}/tz/history")
@@ -473,3 +530,76 @@ async def get_tz_history(project_id: str):
     
     history = await _get_history(project_id)
     return {"versions": history, "count": len(history)}
+
+
+# ── AI Check ──────────────────────────────────────────────────────
+
+@app.post(f"{settings.api_prefix}/projects/{{project_id}}/ai-check")
+async def run_ai_check(project_id: str):
+    from .services.ai.ai_check import run_ai_check as _run_ai_check
+    
+    project = await _get_project(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    # Get all processed models for the project
+    from .db.models import list_all_models
+    all_models = await list_all_models(project_id=project_id)
+    processed_models = [m for m in all_models if m.get("status") == "processed"]
+    
+    if not processed_models:
+        raise HTTPException(
+            status_code=400,
+            detail="Нет обработанных моделей в проекте. Сначала загрузите и обработайте IFC-модель."
+        )
+    
+    # Collect elements from all processed models
+    from .db.models import get_elements
+    all_elements = []
+    for m in processed_models:
+        elems = await get_elements(m["id"])
+        all_elements.extend(elems)
+    
+    # Get TZ data
+    from .db.models import get_project_tz as _get_tz
+    tz_data = await _get_tz(project_id)
+    if tz_data is None:
+        tz_data = {}
+    
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"AI check: {len(all_elements)} elements, {len(processed_models)} models for project {project_id}")
+    
+    problems = await _run_ai_check(project_id, all_elements, tz_data)
+    
+    # Store result in DB so dismissed state survives page refresh
+    from .db.models import save_ai_check_result, get_ai_check_result
+    await save_ai_check_result(project_id, problems)
+    
+    return {"problems": problems, "count": len(problems)}
+
+
+@app.get(f"{settings.api_prefix}/projects/{{project_id}}/ai-check")
+async def get_ai_check(project_id: str):
+    from .db.models import get_ai_check_result as _get_result
+    result = await _get_result(project_id)
+    if result is None:
+        return {"problems": [], "count": 0, "has_result": False}
+    return {"problems": result.get("problems", []), "count": len(result.get("problems", [])), "has_result": True}
+
+
+@app.patch(f"{settings.api_prefix}/projects/{{project_id}}/ai-check/{{problem_index}}")
+async def dismiss_ai_problem(project_id: str, problem_index: int, dismissed: bool = True):
+    from .db.models import get_ai_check_result, save_ai_check_result
+    result = await _get_result(project_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="No AI check result found")
+    
+    problems = result.get("problems", [])
+    if problem_index < 0 or problem_index >= len(problems):
+        raise HTTPException(status_code=404, detail="Problem not found")
+    
+    problems[problem_index]["dismissed"] = dismissed
+    await save_ai_check_result(project_id, problems)
+    
+    return {"dismissed": dismissed, "problem_index": problem_index}

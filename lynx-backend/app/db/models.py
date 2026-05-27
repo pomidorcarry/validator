@@ -1,4 +1,5 @@
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 import uuid
 import json
@@ -25,6 +26,11 @@ class Project(Base):
     tz_sewerage = Column(Text, default="")
     tz_fire_fighting = Column(Text, default="")
     tz_other = Column(Text, default="")
+    project_address = Column(Text, default="")
+    sections_count = Column(Text, default="")
+    floors_count = Column(Text, default="")
+    bim_requirements = Column(Text, default="")
+    pipeline_data = Column(JSON, default=dict)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
@@ -202,6 +208,13 @@ async def init_db():
             for col in tz_cols:
                 if col not in proj_cols:
                     conn.execute(sa.text(f"ALTER TABLE projects ADD COLUMN {col} TEXT"))
+            # Migration: add project detail columns
+            proj_cols2 = [c["name"] for c in insp.get_columns("projects")]
+            for col in ("project_address", "sections_count", "floors_count", "bim_requirements"):
+                if col not in proj_cols2:
+                    conn.execute(sa.text(f"ALTER TABLE projects ADD COLUMN {col} TEXT"))
+            if "pipeline_data" not in proj_cols2:
+                conn.execute(sa.text("ALTER TABLE projects ADD COLUMN pipeline_data JSON"))
             # Migration: add version_number to model_versions
             mv_cols = [c["name"] for c in insp.get_columns("model_versions")]
             if "version_number" not in mv_cols:
@@ -903,15 +916,44 @@ async def get_project_tz(project_id: str) -> Optional[dict]:
         p = result.scalar_one_or_none()
         if not p:
             return None
+        
+        # List files from disk
+        from pathlib import Path
+        from ..core.config import settings as _cfg
+        tz_dir = Path(_cfg.storage_path) / "tz" / project_id
+        file_list = []
+        if tz_dir.exists():
+            from datetime import datetime
+            import json as _json
+            for f in sorted(tz_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
+                if f.is_file() and f.suffix.lower() in (".pdf", ".xlsx", ".xls"):
+                    display_name = f.stem
+                    meta_file = f.with_name(f.name + ".meta")
+                    if meta_file.exists():
+                        try:
+                            meta = _json.loads(meta_file.read_text())
+                            display_name = meta.get("original_name", f.stem)
+                        except Exception:
+                            pass
+                    file_list.append({
+                        "stored_name": f.name,
+                        "display_name": display_name,
+                        "size_bytes": f.stat().st_size,
+                        "uploaded_at": datetime.fromtimestamp(f.stat().st_mtime).isoformat(),
+                    })
+        
         return {
             "tz_general": p.tz_general or "",
             "tz_water_supply": p.tz_water_supply or "",
             "tz_sewerage": p.tz_sewerage or "",
             "tz_fire_fighting": p.tz_fire_fighting or "",
             "tz_other": p.tz_other or "",
-            "tz_file_name": p.tz_file_name,
-            "tz_file_path": p.tz_file_path,
-            "tz_file_uploaded_at": p.tz_file_uploaded_at.isoformat() if p.tz_file_uploaded_at else None,
+            "project_address": p.project_address or "",
+            "sections_count": p.sections_count or "",
+            "floors_count": p.floors_count or "",
+            "bim_requirements": p.bim_requirements or "",
+            "pipeline_data": p.pipeline_data or {},
+            "tz_files": file_list,
         }
 
 
@@ -926,11 +968,14 @@ async def update_project_tz(project_id: str, data: dict, source: str = "manual")
             return None
 
         for field in ("tz_general", "tz_water_supply", "tz_sewerage", "tz_fire_fighting", "tz_other",
-                      "tz_file_name", "tz_file_path"):
+                      "tz_file_name", "tz_file_path", "project_address", "sections_count",
+                      "floors_count", "bim_requirements"):
             if field in data:
                 setattr(p, field, data[field])
         if "tz_file_uploaded_at" in data:
             p.tz_file_uploaded_at = data["tz_file_uploaded_at"]
+        if "pipeline_data" in data:
+            p.pipeline_data = data["pipeline_data"]
 
         await session.commit()
         await session.refresh(p)
@@ -946,6 +991,11 @@ async def update_project_tz(project_id: str, data: dict, source: str = "manual")
             "tz_sewerage": p.tz_sewerage or "",
             "tz_fire_fighting": p.tz_fire_fighting or "",
             "tz_other": p.tz_other or "",
+            "project_address": p.project_address or "",
+            "sections_count": p.sections_count or "",
+            "floors_count": p.floors_count or "",
+            "bim_requirements": p.bim_requirements or "",
+            "pipeline_data": p.pipeline_data or {},
         }
         session.add(TzVersion(
             project_id=project_id,
@@ -962,8 +1012,51 @@ async def update_project_tz(project_id: str, data: dict, source: str = "manual")
             "tz_sewerage": p.tz_sewerage or "",
             "tz_fire_fighting": p.tz_fire_fighting or "",
             "tz_other": p.tz_other or "",
+            "project_address": p.project_address or "",
+            "sections_count": p.sections_count or "",
+            "floors_count": p.floors_count or "",
+            "bim_requirements": p.bim_requirements or "",
+            "pipeline_data": p.pipeline_data or {},
             "tz_file_name": p.tz_file_name,
         }
+
+
+# ── AI Check Result (file-based storage) ──────────────────────────
+
+AI_CHECK_DIR: Optional[Path] = None
+
+
+def _ensure_ai_check_dir() -> Path:
+    global AI_CHECK_DIR
+    if AI_CHECK_DIR is None:
+        from ..core.config import settings as _cfg
+        AI_CHECK_DIR = Path(_cfg.storage_path) / "ai_check"
+        AI_CHECK_DIR.mkdir(parents=True, exist_ok=True)
+    return AI_CHECK_DIR
+
+
+async def save_ai_check_result(project_id: str, problems: list) -> None:
+    import json as _json
+    from datetime import datetime
+    d = _ensure_ai_check_dir()
+    path = d / f"{project_id}.json"
+    path.write_text(_json.dumps({
+        "project_id": project_id,
+        "problems": problems,
+        "updated_at": datetime.utcnow().isoformat(),
+    }, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+async def get_ai_check_result(project_id: str) -> Optional[dict]:
+    import json as _json
+    d = _ensure_ai_check_dir()
+    path = d / f"{project_id}.json"
+    if not path.exists():
+        return None
+    try:
+        return _json.loads(path.read_text())
+    except Exception:
+        return None
 
 
 async def get_tz_history(project_id: str) -> list:

@@ -593,8 +593,13 @@ window.showInspector = function(globalId) {
 // ── Utils ───────────────────────────────────────────────────────
 
 function escHtml(s) {
-    if (!s) return '';
-    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    if (s === null || s === undefined) return '';
+    if (typeof s === 'object') {
+        try { s = JSON.stringify(s, null, 2); } catch(e) { s = String(s); }
+    } else {
+        s = String(s);
+    }
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 function formatDate(s) {
@@ -1229,15 +1234,111 @@ window.switchDataTab = function(tab) {
     });
     document.getElementById('dataCategoriesTab').style.display = tab === 'categories' ? '' : 'none';
     document.getElementById('dataTzTab').style.display = tab === 'tz' ? '' : 'none';
+    document.getElementById('dataAiCheckTab').style.display = tab === 'ai-check' ? '' : 'none';
     document.querySelector('.categories-only').style.display = tab === 'categories' ? '' : 'none';
     document.querySelector('.tz-only').style.display = tab === 'tz' ? '' : 'none';
-    document.getElementById('dataPageMeta').textContent = tab === 'categories'
-        ? 'Настройка категорий элементов модели'
-        : 'Редактирование технического задания';
+    document.querySelector('.ai-check-only').style.display = tab === 'ai-check' ? '' : 'none';
+    var labels = {
+        'categories': 'Настройка категорий элементов модели',
+        'tz': 'Редактирование технического задания',
+        'ai-check': 'Проверка модели с использованием ИИ',
+    };
+    document.getElementById('dataPageMeta').textContent = labels[tab] || '';
     if (tab === 'tz') loadTzSection();
+    if (tab === 'ai-check') loadAiCheck();
 };
 
 // ── TZ section: load, save, upload, AI parse ───────────────────
+
+var _activePipelineSys = 'water_supply';
+
+function _emptyPipeline() {
+    return {
+        water_supply: { mains: {}, risers: {}, distribution: {} },
+        sewerage: { mains: {}, risers: {}, distribution: {} },
+        fire_fighting: { mains: {}, risers: {}, distribution: {} },
+    };
+}
+
+function _renderPipelineTable(sys) {
+    var sysLabels = { water_supply: 'Водоснабжение', sewerage: 'Водоотведение', fire_fighting: 'Пожаротушение' };
+    var sectionLabels = { mains: 'Магистрали', risers: 'Стояки', distribution: 'Разводка' };
+    var sections = ['mains', 'risers', 'distribution'];
+    var pd = window._tzPipelineData || _emptyPipeline();
+    var sysData = pd[sys] || {};
+
+    var tbody = document.getElementById('pipelineTbody');
+    tbody.innerHTML = sections.map(function(sec) {
+        var secData = sysData[sec] || {};
+        return '<tr>' +
+            '<td style="font-weight:600;white-space:nowrap">' + sectionLabels[sec] + '</td>' +
+            '<td><input class="pipe-mat" data-sys="' + sys + '" data-sec="' + sec + '" value="' + escHtml(secData.material || '') + '" placeholder="-"></td>' +
+            '<td><input class="pipe-dia" data-sys="' + sys + '" data-sec="' + sec + '" value="' + escHtml(secData.diameter || '') + '" placeholder="-"></td>' +
+            '<td><input class="pipe-ins" data-sys="' + sys + '" data-sec="' + sec + '" value="' + escHtml(secData.insulation || '') + '" placeholder="-"></td>' +
+        '</tr>';
+    }).join('');
+}
+
+function _readPipelineFromTable() {
+    var pd = _emptyPipeline();
+    document.querySelectorAll('#pipelineTbody input').forEach(function(inp) {
+        var sys = inp.getAttribute('data-sys');
+        var sec = inp.getAttribute('data-sec');
+        var cls = inp.className;
+        var val = inp.value;
+        if (!pd[sys]) pd[sys] = {};
+        if (!pd[sys][sec]) pd[sys][sec] = {};
+        if (cls.indexOf('pipe-mat') >= 0) pd[sys][sec].material = val;
+        else if (cls.indexOf('pipe-dia') >= 0) pd[sys][sec].diameter = val;
+        else if (cls.indexOf('pipe-ins') >= 0) pd[sys][sec].insulation = val;
+    });
+    return pd;
+}
+
+window.switchPipelineTab = function(sys) {
+    _activePipelineSys = sys;
+    document.querySelectorAll('.pipeline-tab').forEach(function(t) {
+        t.classList.toggle('active', t.getAttribute('data-sys') === sys);
+    });
+    _readPipelineFromTable();
+    _renderPipelineTable(sys);
+};
+
+var _tzFileList = [];
+var _selectedTzFile = '';
+
+function _renderTzFileList() {
+    var el = document.getElementById('tzFileList');
+    var btnParse = document.getElementById('btnParseTz');
+    var btnDl = document.getElementById('btnDownloadTz');
+    if (!_tzFileList.length) {
+        el.innerHTML = 'Файлов нет — загрузите PDF или Excel';
+        btnParse.disabled = true;
+        btnDl.style.display = 'none';
+        return;
+    }
+    btnParse.disabled = false;
+        var html = _tzFileList.map(function(f) {
+        var size = f.size_bytes < 1024 ? f.size_bytes + ' B' : (f.size_bytes / 1024).toFixed(1) + ' KB';
+        var date = f.uploaded_at ? new Date(f.uploaded_at).toLocaleString('ru-RU') : '';
+        var selected = f.stored_name === _selectedTzFile;
+        var label = f.display_name || f.stored_name;
+        return '<label style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:4px;background:' + (selected ? 'var(--accent-light)' : 'transparent') + ';cursor:pointer">' +
+            '<input type="radio" name="tzFile" value="' + f.stored_name + '" ' + (selected ? 'checked' : '') + ' onchange="selectTzFile(\'' + f.stored_name + '\')" />' +
+            '<span style="flex:1;font-size:13px">' + escHtml(label) + '</span>' +
+            '<span style="font-size:11px;color:var(--text-secondary)">' + size + '</span>' +
+            '<span style="font-size:11px;color:var(--text-secondary)">' + date + '</span>' +
+            '<span style="cursor:pointer;color:var(--text-secondary);opacity:0.4;font-size:14px;padding:0 4px" onclick="event.stopPropagation();deleteTzFile(\'' + f.stored_name + '\')" title="Удалить файл">✕</span>' +
+        '</label>';
+    }).join('');
+    el.innerHTML = html;
+    btnDl.style.display = _selectedTzFile ? '' : 'none';
+}
+
+window.selectTzFile = function(storedName) {
+    _selectedTzFile = storedName;
+    _renderTzFileList();
+};
 
 async function loadTzSection() {
     try {
@@ -1250,19 +1351,25 @@ async function loadTzSection() {
         document.getElementById('tzSewerage').value = data.tz_sewerage || '';
         document.getElementById('tzFireFighting').value = data.tz_fire_fighting || '';
         document.getElementById('tzOther').value = data.tz_other || '';
+        document.getElementById('projectAddress').value = data.project_address || '';
+        document.getElementById('sectionsCount').value = data.sections_count || '';
+        document.getElementById('floorsCount').value = data.floors_count || '';
+        document.getElementById('bimRequirements').value = data.bim_requirements || '';
 
-        var fileInfo = document.getElementById('tzFileInfo');
-        var btnDl = document.getElementById('btnDownloadTz');
-        if (data.tz_file_name) {
-            var dateStr = data.tz_file_uploaded_at ? new Date(data.tz_file_uploaded_at).toLocaleString('ru-RU') : '';
-            fileInfo.textContent = 'Файл: ' + data.tz_file_name + (dateStr ? ' (загружен ' + dateStr + ')' : '');
-            btnDl.style.display = '';
-        } else {
-            fileInfo.textContent = 'Файл не загружен';
-            btnDl.style.display = 'none';
+        window._tzPipelineData = data.pipeline_data || _emptyPipeline();
+        _activePipelineSys = 'water_supply';
+        document.querySelectorAll('.pipeline-tab').forEach(function(t) {
+            t.classList.toggle('active', t.getAttribute('data-sys') === 'water_supply');
+        });
+        _renderPipelineTable(_activePipelineSys);
+
+        // File list
+        _tzFileList = data.tz_files || [];
+        if (_tzFileList.length && !_selectedTzFile) {
+            _selectedTzFile = _tzFileList[0].stored_name;
         }
+        _renderTzFileList();
 
-        // Load history in background
         loadTzHistory();
     } catch (e) {
         showToast('Ошибка загрузки ТЗ: ' + e.message, 'error');
@@ -1293,12 +1400,18 @@ async function loadTzHistory() {
 }
 
 window.saveTzSection = async function() {
+    _readPipelineFromTable();
     var data = {
         tz_general: document.getElementById('tzGeneral').value,
         tz_water_supply: document.getElementById('tzWaterSupply').value,
         tz_sewerage: document.getElementById('tzSewerage').value,
         tz_fire_fighting: document.getElementById('tzFireFighting').value,
         tz_other: document.getElementById('tzOther').value,
+        project_address: document.getElementById('projectAddress').value,
+        sections_count: document.getElementById('sectionsCount').value,
+        floors_count: document.getElementById('floorsCount').value,
+        bim_requirements: document.getElementById('bimRequirements').value,
+        pipeline_data: window._tzPipelineData || _emptyPipeline(),
     };
     try {
         var resp = await fetch(API_BASE + '/projects/' + currentProjectId + '/tz', {
@@ -1331,36 +1444,296 @@ window.uploadTzFile = async function(file) {
     }
 };
 
+window.downloadTzFile = function() {
+    if (!_selectedTzFile) return;
+    window.open(API_BASE + '/projects/' + currentProjectId + '/tz/file?filename=' + encodeURIComponent(_selectedTzFile), '_blank');
+};
+
+window.deleteTzFile = async function(storedName) {
+    if (!confirm('Удалить файл ' + storedName + '?')) return;
+    try {
+        var resp = await fetch(API_BASE + '/projects/' + currentProjectId + '/tz/files?filename=' + encodeURIComponent(storedName), {
+            method: 'DELETE',
+        });
+        if (!resp.ok) {
+            var err = await resp.json().catch(function(){return null});
+            throw new Error((err && err.detail) || 'HTTP ' + resp.status);
+        }
+        if (_selectedTzFile === storedName) {
+            _selectedTzFile = '';
+        }
+        showToast('Файл удалён', 'success');
+        loadTzSection();
+    } catch (e) {
+        showToast('Ошибка удаления: ' + e.message, 'error');
+    }
+};
+
 window.parseTzAi = async function() {
     var btn = document.getElementById('btnParseTz');
+    if (!_selectedTzFile) {
+        showToast('Выберите файл для распознавания', 'error');
+        return;
+    }
     btn.disabled = true;
     btn.textContent = '⏳ Распознавание...';
     try {
-        var resp = await fetch(API_BASE + '/projects/' + currentProjectId + '/tz/parse', {
-            method: 'POST',
-        });
+        var url = API_BASE + '/projects/' + currentProjectId + '/tz/parse?filename=' + encodeURIComponent(_selectedTzFile);
+        var resp = await fetch(url, { method: 'POST' });
         if (!resp.ok) {
-            var err = await resp.json().catch(function() { return null; });
-            throw new Error((err && err.detail) || 'HTTP ' + resp.status);
+            var errBody = '';
+            try { var errJson = await resp.json(); errBody = errJson.detail || JSON.stringify(errJson); } catch(e2) { errBody = await resp.text(); }
+            throw new Error(errBody || 'HTTP ' + resp.status);
         }
         var data = await resp.json();
-        document.getElementById('tzGeneral').value = data.tz_general || '';
-        document.getElementById('tzWaterSupply').value = data.tz_water_supply || '';
-        document.getElementById('tzSewerage').value = data.tz_sewerage || '';
-        document.getElementById('tzFireFighting').value = data.tz_fire_fighting || '';
-        document.getElementById('tzOther').value = data.tz_other || '';
-        showToast('ТЗ распознано через ИИ', 'success');
-        loadTzHistory();
+
+        // Store parsed data for preview modal
+        window._tzPreviewData = data;
+
+        // Build preview HTML
+        var html = '';
+        html += '<div class="form-group"><label class="form-label" style="font-size:12px;text-transform:uppercase;color:var(--text-secondary)">Адрес объекта</label>';
+        html += '<input class="form-input preview-tz-field" id="pv_address" value="' + escHtml(data.project_address || '') + '" /></div>';
+        html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">';
+        html += '<div class="form-group"><label class="form-label" style="font-size:12px;text-transform:uppercase;color:var(--text-secondary)">Секций</label><input class="form-input preview-tz-field" id="pv_sections" value="' + escHtml(data.sections_count || '') + '" /></div>';
+        html += '<div class="form-group"><label class="form-label" style="font-size:12px;text-transform:uppercase;color:var(--text-secondary)">Этажей</label><input class="form-input preview-tz-field" id="pv_floors" value="' + escHtml(data.floors_count || '') + '" /></div>';
+        html += '</div>';
+        html += '<div class="form-group"><label class="form-label" style="font-size:12px;text-transform:uppercase;color:var(--text-secondary)">BIM-требования</label>';
+        html += '<input class="form-input preview-tz-field" id="pv_bim" value="' + escHtml(data.bim_requirements || '') + '" /></div>';
+        html += '<div class="form-group"><label class="form-label" style="font-size:12px;text-transform:uppercase;color:var(--text-secondary)">Общее описание</label>';
+        html += '<textarea class="form-textarea preview-tz-field" id="pv_general" rows="3">' + escHtml(data.tz_general || '') + '</textarea></div>';
+        html += '<div class="form-group"><label class="form-label" style="font-size:12px;text-transform:uppercase;color:var(--text-secondary)">Водоснабжение</label>';
+        html += '<textarea class="form-textarea preview-tz-field" id="pv_ws" rows="2">' + escHtml(data.tz_water_supply || '') + '</textarea></div>';
+        html += '<div class="form-group"><label class="form-label" style="font-size:12px;text-transform:uppercase;color:var(--text-secondary)">Водоотведение</label>';
+        html += '<textarea class="form-textarea preview-tz-field" id="pv_sew" rows="2">' + escHtml(data.tz_sewerage || '') + '</textarea></div>';
+        html += '<div class="form-group"><label class="form-label" style="font-size:12px;text-transform:uppercase;color:var(--text-secondary)">Пожаротушение</label>';
+        html += '<textarea class="form-textarea preview-tz-field" id="pv_ff" rows="2">' + escHtml(data.tz_fire_fighting || '') + '</textarea></div>';
+        html += '<div class="form-group"><label class="form-label" style="font-size:12px;text-transform:uppercase;color:var(--text-secondary)">Прочие</label>';
+        html += '<textarea class="form-textarea preview-tz-field" id="pv_other" rows="2">' + escHtml(data.tz_other || '') + '</textarea></div>';
+
+        // Pipeline data preview - simple fields for each system
+        var pd = data.pipeline_data || {};
+        var sysList = ['water_supply', 'sewerage', 'fire_fighting'];
+        var sysLabels = { water_supply: 'Водоснабжение', sewerage: 'Водоотведение', fire_fighting: 'Пожаротушение' };
+        var secLabels = { mains: 'Магистрали', risers: 'Стояки', distribution: 'Разводка' };
+        html += '<div style="margin-top:12px"><div style="font-size:12px;text-transform:uppercase;color:var(--text-secondary);font-weight:600;margin-bottom:8px">Трубопроводы</div>';
+        sysList.forEach(function(sys) {
+            var sysData = pd[sys] || {};
+            ['mains', 'risers', 'distribution'].forEach(function(sec) {
+                var s = sysData[sec] || {};
+                var mat = s.material || '';
+                var dia = s.diameter || '';
+                var ins = s.insulation || '';
+                if (mat || dia || ins) {
+                    html += '<div style="font-size:12px;margin-bottom:4px"><span style="color:var(--text-secondary)">' + sysLabels[sys] + ' / ' + secLabels[sec] + ':</span> ' +
+                        (mat ? 'мат: ' + escHtml(mat) : '') + (dia ? ', d: ' + escHtml(dia) : '') + (ins ? ', изол: ' + escHtml(ins) : '') + '</div>';
+                }
+            });
+        });
+        html += '</div>';
+
+        // Raw GPT response & prompt
+        if (data._raw_gpt || data._raw_prompt) {
+            html += '<details style="margin-top:16px">' +
+                '<summary style="cursor:pointer;font-size:12px;color:var(--text-secondary)">📜 Промпт и ответ GPT</summary>' +
+                (data._raw_prompt ? '<div style="margin-top:8px"><div style="font-size:11px;text-transform:uppercase;color:var(--text-secondary);margin-bottom:4px">Промпт (system + user):</div>' +
+                '<pre style="padding:12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-size:11px;line-height:1.4;overflow-x:auto;white-space:pre-wrap;word-break:break-word;max-height:200px;overflow-y:auto">' + escHtml(data._raw_prompt) + '</pre></div>' : '') +
+                (data._raw_gpt ? '<div style="margin-top:8px"><div style="font-size:11px;text-transform:uppercase;color:var(--text-secondary);margin-bottom:4px">Ответ GPT:</div>' +
+                '<pre style="padding:12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-size:11px;line-height:1.4;overflow-x:auto;white-space:pre-wrap;word-break:break-word;max-height:300px;overflow-y:auto">' + escHtml(data._raw_gpt) + '</pre></div>' : '') +
+            '</details>';
+        }
+
+        document.getElementById('tzPreviewContent').innerHTML = html;
+        openModal('tzPreviewModal');
     } catch (e) {
         showToast('Ошибка распознавания: ' + e.message, 'error');
     } finally {
         btn.disabled = false;
-        btn.textContent = '⚡ Распознать через ИИ';
+        btn.textContent = '⚡ Распознать выбранный';
     }
 };
 
-window.downloadTzFile = function() {
-    window.open(API_BASE + '/projects/' + currentProjectId + '/tz/file', '_blank');
+window.applyTzPreview = function() {
+    function gv(id) { return document.getElementById(id).value; }
+    var fields = {
+        tz_general: gv('pv_general'),
+        tz_water_supply: gv('pv_ws'),
+        tz_sewerage: gv('pv_sew'),
+        tz_fire_fighting: gv('pv_ff'),
+        tz_other: gv('pv_other'),
+        project_address: gv('pv_address'),
+        sections_count: gv('pv_sections'),
+        floors_count: gv('pv_floors'),
+        bim_requirements: gv('pv_bim'),
+    };
+    // Only send non-empty fields — don't overwrite existing data with blanks
+    var data = {};
+    for (var key in fields) {
+        if (fields[key].trim()) {
+            data[key] = fields[key];
+        }
+    }
+    var pd = window._tzPreviewData && window._tzPreviewData.pipeline_data;
+    if (pd) {
+        var hasData = false;
+        ['water_supply','sewerage','fire_fighting'].forEach(function(sys) {
+            ['mains','risers','distribution'].forEach(function(sec) {
+                var s = (pd[sys]||{})[sec]||{};
+                if (s.material || s.diameter || s.insulation) hasData = true;
+            });
+        });
+        if (hasData) data.pipeline_data = pd;
+    }
+
+    if (Object.keys(data).length === 0) {
+        showToast('Нет данных для сохранения', 'warning');
+        closeModal('tzPreviewModal');
+        return;
+    }
+
+    // Save to DB
+    fetch(API_BASE + '/projects/' + currentProjectId + '/tz', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    })
+    .then(function(r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        showToast('ТЗ сохранено', 'success');
+        closeModal('tzPreviewModal');
+        loadTzSection();
+        loadTzHistory();
+        return r.json();
+    })
+    .catch(function(e) {
+        showToast('Ошибка: ' + e.message, 'error');
+    });
+};
+
+// ── AI Check ─────────────────────────────────────────────────────
+
+var _aiCheckProblems = [];
+
+async function loadAiCheck() {
+    try {
+        var resp = await fetch(API_BASE + '/projects/' + currentProjectId + '/ai-check');
+        if (!resp.ok) return;
+        var data = await resp.json();
+        if (data.has_result && data.problems && data.problems.length) {
+            _aiCheckProblems = data.problems;
+            renderAiCheckProblems();
+        } else {
+            showAiCheckStart();
+        }
+    } catch(e) {
+        showAiCheckStart();
+    }
+}
+
+function showAiCheckStart() {
+    document.getElementById('aiCheckCenter').style.display = 'flex';
+    document.getElementById('aiCheckResults').style.display = 'none';
+    document.getElementById('aiCheckBtn').disabled = false;
+    document.getElementById('aiCheckBtn').textContent = '🔍 Проверить';
+    document.getElementById('aiCheckStatus').textContent = 'Сравнение элементов BIM-модели с ТЗ и нормами СП';
+}
+
+function showAiCheckLoading() {
+    document.getElementById('aiCheckCenter').style.display = 'flex';
+    document.getElementById('aiCheckResults').style.display = 'none';
+    document.getElementById('aiCheckBtn').disabled = true;
+    document.getElementById('aiCheckBtn').textContent = '⏳ Проверка...';
+    document.getElementById('aiCheckStatus').textContent = 'Анализ элементов модели, ТЗ и норм СП...';
+}
+
+function renderAiCheckProblems() {
+    document.getElementById('aiCheckCenter').style.display = 'none';
+    document.getElementById('aiCheckResults').style.display = 'block';
+    document.getElementById('aiCheckBtn').disabled = false;
+    document.getElementById('aiCheckBtn').textContent = '🔍 Проверить';
+
+    var errorCount = 0;
+    var warningCount = 0;
+    var dismissedCount = 0;
+    _aiCheckProblems.forEach(function(p) {
+        if (p.dismissed) { dismissedCount++; return; }
+        if (p.severity === 'error') errorCount++;
+        else warningCount++;
+    });
+
+    var counter = document.getElementById('aiCheckCounter');
+    var parts = [];
+    if (errorCount) parts.push('<span style="color:var(--error)">' + errorCount + ' ошибок</span>');
+    if (warningCount) parts.push('<span style="color:var(--warning)">' + warningCount + ' предупреждений</span>');
+    if (dismissedCount) parts.push('<span style="color:var(--text-secondary)">' + dismissedCount + ' отклонено</span>');
+    counter.innerHTML = 'Найдено: ' + (parts.length ? parts.join(' · ') : 'проблем не обнаружено ✓');
+
+    if (!_aiCheckProblems.length) {
+        document.getElementById('aiCheckProblemList').innerHTML =
+            '<div class="ai-check-empty"><div class="big-icon">✅</div><p>Проблем не обнаружено</p></div>';
+        return;
+    }
+
+    var html = '';
+    _aiCheckProblems.forEach(function(p, i) {
+        var sevClass = p.severity === 'error' ? 'error' : 'warning';
+        var dismissed = p.dismissed ? ' dismissed' : '';
+        var dismissIcon = p.dismissed ? '↩' : '✕';
+        var dismissTitle = p.dismissed ? 'Восстановить' : 'Отклонить';
+        html +=
+            '<div class="ai-problem-card' + dismissed + '" data-index="' + i + '">' +
+                '<div class="ai-problem-severity ' + sevClass + '"></div>' +
+                '<div class="ai-problem-body">' +
+                    '<div class="ai-problem-msg">' + escHtml(p.message) + '</div>' +
+                    (p.details ? '<div class="ai-problem-details">' + escHtml(p.details) + '</div>' : '') +
+                    (p.rule_key ? '<div class="ai-problem-rule">' + escHtml(p.rule_key) + '</div>' : '') +
+                '</div>' +
+                '<button class="ai-problem-dismiss" onclick="toggleAiProblem(' + i + ')" title="' + dismissTitle + '">' + dismissIcon + '</button>' +
+            '</div>';
+    });
+    document.getElementById('aiCheckProblemList').innerHTML = html;
+}
+
+window.runAiCheck = async function() {
+    if (!currentProjectId) return;
+    showAiCheckLoading();
+    try {
+        var resp = await fetch(API_BASE + '/projects/' + currentProjectId + '/ai-check', {
+            method: 'POST',
+        });
+        if (!resp.ok) {
+            var errDetail = '';
+            try { var errJson = await resp.json(); errDetail = errJson.detail || ''; } catch(e2) {}
+            throw new Error(errDetail || 'HTTP ' + resp.status);
+        }
+        var data = await resp.json();
+        _aiCheckProblems = data.problems || [];
+        renderAiCheckProblems();
+        if (!_aiCheckProblems.length) {
+            showToast('Проверка завершена — проблем не найдено', 'success');
+        } else {
+            showToast('Найдено ' + _aiCheckProblems.length + ' замечаний', _aiCheckProblems.some(function(p) { return p.severity === 'error'; }) ? 'error' : 'success');
+        }
+    } catch(e) {
+        showAiCheckStart();
+        showToast('Ошибка проверки: ' + e.message, 'error');
+    }
+};
+
+window.toggleAiProblem = async function(index) {
+    var problem = _aiCheckProblems[index];
+    if (!problem) return;
+    var newState = !problem.dismissed;
+    try {
+        var resp = await fetch(API_BASE + '/projects/' + currentProjectId + '/ai-check/' + index + '?dismissed=' + newState, {
+            method: 'PATCH',
+        });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        _aiCheckProblems[index].dismissed = newState;
+        renderAiCheckProblems();
+    } catch(e) {
+        showToast('Ошибка: ' + e.message, 'error');
+    }
 };
 
 function renderDataCategories() {
