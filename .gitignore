@@ -2,9 +2,6 @@
 # Lynx Backend
 # =====================
 
-lynx-backend/.env.example
-lynx-backend/.env
-
 # SQLite database (can be 150+ MB)
 lynx-backend/lynx.db
 
@@ -58,10 +55,11 @@ lynx-revit-plugin/obj/
 .idea/
 .opencode/
 AGENTS.md
+agents.md
 *.suo
 *.user
 *.userosscache
 *.sln.docstates
 Thumbs.db
 .DS_Store
-opencode.json
+
