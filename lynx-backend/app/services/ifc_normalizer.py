@@ -4,9 +4,12 @@ from ifcopenshell.util import unit as unit_util
 from typing import Optional
 from datetime import datetime
 from pathlib import Path
+import uuid
 import logging
 
-from ..db.models import ModelVersion, Element, async_session
+from ..db.models import ModelVersion, Element
+from ..db.base import async_session
+from ..db.element_storage import save_raw, save_norm
 
 logger = logging.getLogger(__name__)
 
@@ -158,7 +161,9 @@ async def process_model_version(model_version_id: str):
         
         async with async_session() as session:
             for el_data in elements:
+                el_id = str(uuid.uuid4())
                 el = Element(
+                    id=el_id,
                     model_version_id=model_version_id,
                     global_id=el_data["global_id"],
                     ifc_id=el_data["ifc_id"],
@@ -169,10 +174,12 @@ async def process_model_version(model_version_id: str):
                     type_name=el_data["type_name"],
                     storey_name=el_data["storey_name"],
                     system_name=el_data["system_name"],
-                    raw_psets_jsonb=el_data["raw_psets"],
-                    normalized_jsonb=el_data["canonical"],
+                    raw_psets_jsonb={},
+                    normalized_jsonb={},
                 )
                 session.add(el)
+                save_raw(el_id, el_data["raw_psets"])
+                save_norm(el_id, el_data["canonical"])
             
             await session.execute(
                 update(ModelVersion)

@@ -4,7 +4,9 @@ from typing import Any, Optional
 from datetime import datetime
 import uuid
 
-from ..db.models import Element, Issue, ModelVersion, async_session, DEFAULT_CATEGORIES, extract_model_group
+from ..db.models import Element, Issue, ModelVersion, DEFAULT_CATEGORIES, extract_model_group
+from ..db.base import async_session
+from ..db.element_storage import load_raw as _load_raw, load_norm as _load_norm
 
 # Categories that are checked by rules (all except "Невалидируемое семейство")
 VALID_CATEGORIES = [c.lower() for c in DEFAULT_CATEGORIES if c != "Невалидируемое семейство"]
@@ -289,8 +291,8 @@ async def run_rules(model_version_id: str, rules: list[dict] = None):
         issues_created = 0
         for rule in rules:
             for el in elements:
-                normalized = el.normalized_jsonb or {}
-                raw_psets = el.raw_psets_jsonb or {}
+                normalized = _load_norm(el.id) or {}
+                raw_psets = _load_raw(el.id) or {}
                 params = {}
                 if isinstance(raw_psets, dict):
                     for pset_data in raw_psets.values():

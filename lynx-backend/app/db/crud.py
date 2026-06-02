@@ -10,6 +10,7 @@ from .models_orm import (
     Report, TzVersion,
 )
 from . import base as _base
+from .element_storage import load_raw as _load_raw, load_norm as _load_norm
 
 
 async def create_model_version(
@@ -93,8 +94,11 @@ async def get_elements(model_version_id: str) -> list:
             select(Element).where(Element.model_version_id == model_version_id)
         )
         elements = result.scalars().all()
-        return [
-            {
+        result_list = []
+        for e in elements:
+            raw = _load_raw(e.id)
+            norm = _load_norm(e.id)
+            result_list.append({
                 "id": e.id,
                 "global_id": e.global_id,
                 "ifc_class": e.ifc_class,
@@ -103,12 +107,11 @@ async def get_elements(model_version_id: str) -> list:
                 "type_name": e.type_name,
                 "storey_name": e.storey_name,
                 "system_name": e.system_name,
-                "model_group": extract_model_group(e.raw_psets_jsonb, e.normalized_jsonb, e.ifc_class),
-                "raw_psets_jsonb": e.raw_psets_jsonb,
-                "normalized_jsonb": e.normalized_jsonb,
-            }
-            for e in elements
-        ]
+                "model_group": extract_model_group(raw, norm, e.ifc_class),
+                "raw_psets_jsonb": raw,
+                "normalized_jsonb": norm,
+            })
+        return result_list
 
 
 def extract_model_group(raw_psets, normalized, ifc_class):
@@ -500,9 +503,9 @@ async def save_project_categories(project_id: str, categories: list) -> list:
                 )).scalars().all()
 
                 for el in elements:
-                    changed = False
-                    rp = el.raw_psets_jsonb
+                    rp = _load_raw(el.id)
                     if rp and isinstance(rp, dict):
+                        changed = False
                         for pset_name, props in rp.items():
                             if isinstance(props, dict):
                                 for key, val in list(props.items()):
@@ -510,8 +513,9 @@ async def save_project_categories(project_id: str, categories: list) -> list:
                                     if val_str in rename_map:
                                         props[key] = rename_map[val_str]
                                         changed = True
-                    if changed:
-                        el.raw_psets_jsonb = rp
+                        if changed:
+                            from .element_storage import save_raw as _save_raw
+                            _save_raw(el.id, rp)
 
         await session.commit()
         return await list_project_categories(project_id)

@@ -20,6 +20,9 @@ lynx-backend/storage/tz/*/*.meta
 # AI check cache
 lynx-backend/storage/ai_check/*.json
 
+# Element JSON data (moved from DB to filesystem)
+lynx-backend/storage/elements/*.json
+
 # Fix suggestions cache
 lynx-backend/storage/fix_suggestions/*.json
 
@@ -42,11 +45,13 @@ lynx-revit-plugin/bin/
 lynx-revit-plugin/obj/
 
 # =====================
-# IDE / OS
+# IDE / OS / Agents
 # =====================
 
 .vs/
 .idea/
+.opencode/
+AGENTS.md
 *.suo
 *.user
 *.userosscache

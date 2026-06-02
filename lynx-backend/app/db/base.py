@@ -174,4 +174,34 @@ async def init_db():
                         sa.text("UPDATE elements SET storey_name = :s, system_name = :sys WHERE id = :id"),
                         {"s": new_storey, "sys": new_system, "id": eid}
                     )
+            # Migration: export raw_psets_jsonb / normalized_jsonb from DB to files
+            rows2 = conn.execute(
+                sa.text("SELECT id, raw_psets_jsonb, normalized_jsonb FROM elements WHERE raw_psets_jsonb IS NOT NULL")
+            ).fetchall()
+            exported = 0
+            if rows2:
+                from .element_storage import save_raw as _save_raw, save_norm as _save_norm, has_storage
+                for eid, rp, nb in rows2:
+                    if has_storage(eid):
+                        continue
+                    if rp:
+                        try:
+                            _save_raw(eid, _json.loads(rp) if isinstance(rp, str) else rp)
+                        except Exception:
+                            pass
+                    if nb:
+                        try:
+                            _save_norm(eid, _json.loads(nb) if isinstance(nb, str) else nb)
+                        except Exception:
+                            pass
+                    exported += 1
+            if exported:
+                import logging
+                logging.getLogger(__name__).info(f"Exported {exported} element JSON blobs to disk")
+            # Migration: clear JSON columns from DB after successful export
+            conn.execute(
+                sa.text("UPDATE elements SET raw_psets_jsonb = NULL, normalized_jsonb = NULL WHERE raw_psets_jsonb IS NOT NULL")
+            )
+            if exported:
+                logging.getLogger(__name__).info(f"Cleared JSON columns from {exported} elements — DB size will shrink after VACUUM")
         await conn.run_sync(_migrate)
