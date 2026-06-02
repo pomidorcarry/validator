@@ -58,3 +58,4 @@ AGENTS.md
 *.sln.docstates
 Thumbs.db
 .DS_Store
+opencode.json
