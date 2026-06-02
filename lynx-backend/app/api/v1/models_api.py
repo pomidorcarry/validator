@@ -71,7 +71,8 @@ async def list_models(project_id: str = None):
 
 @router.delete("/models")
 async def delete_all_models():
-    from ...db.models import async_session, ModelVersion, Element, Issue, Artifact
+    from ...db.base import async_session
+    from ...db.models import ModelVersion, Element, Issue, Artifact
 
     async with async_session() as session:
         await session.execute(delete(Issue))
@@ -103,7 +104,8 @@ async def get_model(model_version_id: str):
 
 @router.delete("/models/{model_version_id}")
 async def delete_model(model_version_id: str):
-    from ...db.models import async_session, ModelVersion, Element, Issue, Artifact
+    from ...db.base import async_session
+    from ...db.models import ModelVersion, Element, Issue, Artifact
 
     async with async_session() as session:
         await session.execute(delete(Issue).where(Issue.model_version_id == model_version_id))
@@ -151,7 +153,8 @@ async def get_model_elements(model_version_id: str):
 @router.post("/models/{model_version_id}/reprocess-rules")
 async def reprocess_rules(model_version_id: str):
     from ...services.rule_engine import run_rules
-    from ...db.models import async_session, Issue
+    from ...db.base import async_session
+    from ...db.models import Issue
     from sqlalchemy import delete
 
     async with async_session() as session:

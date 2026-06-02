@@ -1,0 +1,55 @@
+# =====================
+# Lynx Backend
+# =====================
+
+# SQLite database (can be 150+ MB)
+lynx-backend/lynx.db
+
+# IFC files (30+ MB each)
+lynx-backend/storage/raw/*.ifc
+
+# XKT generated files
+lynx-backend/storage/xkt/*.xkt
+
+# Uploaded TZ files (PDF/Excel)
+lynx-backend/storage/tz/*/*.pdf
+lynx-backend/storage/tz/*/*.xlsx
+lynx-backend/storage/tz/*/*.xls
+lynx-backend/storage/tz/*/*.meta
+
+# AI check cache
+lynx-backend/storage/ai_check/*.json
+
+# Fix suggestions cache
+lynx-backend/storage/fix_suggestions/*.json
+
+# Python cache
+lynx-backend/**/__pycache__/
+lynx-backend/**/*.pyc
+
+# =====================
+# Lynx Frontend
+# =====================
+
+lynx-frontend/node_modules/
+lynx-frontend/dist/
+
+# =====================
+# Lynx Revit Plugin
+# =====================
+
+lynx-revit-plugin/bin/
+lynx-revit-plugin/obj/
+
+# =====================
+# IDE / OS
+# =====================
+
+.vs/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+Thumbs.db
+.DS_Store

@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from .core.config import settings
-from .db.models import init_db
+from .db.base import init_db
 
 from .api.v1 import health, ai_status, projects_api, models_api, categories_api, tz_api, ai_check_api, fix_suggestions_api
 
