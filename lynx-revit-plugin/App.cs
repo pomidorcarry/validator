@@ -44,6 +44,16 @@ namespace LynxRevitPlugin
             panel.AddItem(exportIfcButton);
             panel.AddItem(settingsButton);
 
+            var applyFixesButton = new PushButtonData(
+                "ApplyFixes",
+                "Применить исправления",
+                assemblyPath,
+                "LynxRevitPlugin.ApplyFixesCommand")
+            {
+                ToolTip = "Применить AI-исправления к модели"
+            };
+            panel.AddItem(applyFixesButton);
+
             return Result.Succeeded;
         }
 

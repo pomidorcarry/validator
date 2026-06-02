@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from .core.config import settings
 from .db.models import init_db
 
-from .api.v1 import health, ai_status, projects_api, models_api, categories_api, tz_api, ai_check_api
+from .api.v1 import health, ai_status, projects_api, models_api, categories_api, tz_api, ai_check_api, fix_suggestions_api
 
 
 @asynccontextmanager
@@ -47,3 +47,4 @@ app.include_router(models_api.router, prefix=api_prefix)
 app.include_router(categories_api.router, prefix=api_prefix)
 app.include_router(tz_api.router, prefix=api_prefix)
 app.include_router(ai_check_api.router, prefix=api_prefix)
+app.include_router(fix_suggestions_api.router, prefix=api_prefix)
