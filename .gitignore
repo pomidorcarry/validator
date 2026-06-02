@@ -2,6 +2,9 @@
 # Lynx Backend
 # =====================
 
+lynx-backend/.env.example
+lynx-backend/.env
+
 # SQLite database (can be 150+ MB)
 lynx-backend/lynx.db
 
