@@ -54,6 +54,7 @@ lynx-revit-plugin/obj/
 .vs/
 .idea/
 .opencode/
+opencode.json
 AGENTS.md
 agents.md
 *.suo
@@ -62,4 +63,4 @@ agents.md
 *.sln.docstates
 Thumbs.db
 .DS_Store
-opencode.json
+
