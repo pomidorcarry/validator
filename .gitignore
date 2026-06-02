@@ -33,6 +33,9 @@ lynx-backend/storage/fix_suggestions/*.json
 lynx-backend/**/__pycache__/
 lynx-backend/**/*.pyc
 
+# Environment files (contain secrets)
+lynx-backend/.env
+
 # =====================
 # Lynx Frontend
 # =====================
