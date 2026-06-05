@@ -274,6 +274,11 @@ DEFAULT_RULES = [
 
 ]
 
+RULES_BY_IFC_CLASS: set[str] = set()
+for r in DEFAULT_RULES:
+    for cls in r.get("applies_to", {}).get("ifc_classes", []):
+        RULES_BY_IFC_CLASS.add(cls)
+
 
 async def run_rules(model_version_id: str, rules: list[dict] = None):
     """Запуск правил против элементов модели."""
@@ -302,12 +307,13 @@ async def run_rules(model_version_id: str, rules: list[dict] = None):
                                     params[k] = v
                 # Skip elements in "Невалидируемое семейство"
                 model_group = extract_model_group(raw_psets, normalized, el.ifc_class)
-                if model_group:
-                    mg_lower = model_group.strip().lower()
-                    is_valid = any(cat in mg_lower for cat in VALID_CATEGORIES)
-                else:
-                    is_valid = False
-                if not is_valid:
+                mg_lower = (model_group or '').strip().lower()
+                has_valid_category = any(cat in mg_lower for cat in VALID_CATEGORIES)
+                is_known_ifc_class = el.ifc_class in RULES_BY_IFC_CLASS
+                # When model_group falls back to ifc_class (no "Модель" property),
+                # trust the IFC class instead of skipping.
+                is_fallback = mg_lower == el.ifc_class.strip().lower()
+                if not has_valid_category and not (is_fallback and is_known_ifc_class):
                     continue
                 
                 el_dict = {

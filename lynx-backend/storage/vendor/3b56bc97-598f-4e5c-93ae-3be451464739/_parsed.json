@@ -1,0 +1,30 @@
+{
+  "general_notes": "ТЗ MLB 01-04. Основные производители инженерного оборудования.",
+  "water_supply_manufacturers": "Насосы: Wilo, Grundfos. Арматура: Danfoss, Valtec, ADL, Naval, Broen Ballomax, Bugatti, Flamco, Giacomini. Трубы: РосТурПласт (ПП PN20/PN25), ГОСТ 9941-81 (нерж. сталь). Изоляция: K-Flex, Armacell, Energoflex Super Protect, Изодом. Коллекторы: АкваСмарт, Пульсар. Счётчики: Пульсар.",
+  "sewerage_manufacturers": "Насосы: Sololift (Grundfos). Трубы: РосТурПласт (ПП), SML (чугун), НПВХ ГОСТ 54475-2011, ПЭ ГОСТ 18599-2001. Изоляция: K-Flex (ливневка). Воронки: HUTTERER & LECHNER. Противопожарные муфты: Rehau, Огракс, Огнеза.",
+  "fire_fighting_manufacturers": "Насосы: Wilo, Grundfos. Трубы: ГОСТ 3262-75 (водогазопроводные), ГОСТ 10704-91 (электросварные). Шкафы: НПО Пульс (ШПК-Пульс). Оросители: Спецавтоматика, Бийск (СВУ, ДВУ).",
+  "_manufacturers": {
+    "water_supply": {
+      "pumps": "Wilo, Grundfos",
+      "valves": "Danfoss, Valtec, ADL, Naval, Broen Ballomax, Bugatti, Flamco, Giacomini",
+      "pipe_fittings": "РосТурПласт (ПП, СП), ГОСТ 9941-81 (нерж. сталь)",
+      "insulation": "K-Flex, Armacell, Energoflex Super Protect, Изодом",
+      "manifold": "АкваСмарт, Пульсар",
+      "additional": "Счётчики воды Пульсар, манометры кл. точности 1,5, гильзы стальные"
+    },
+    "sewerage": {
+      "pumps": "Sololift (Grundfos)",
+      "valves": "-",
+      "pipe_fittings": "РосТурПласт (ПП), SML (чугун), НПВХ ГОСТ 54475-2011, ПЭ ГОСТ 18599-2001",
+      "insulation": "K-Flex (ливневая канализация)",
+      "additional": "Воронки HUTTERER & LECHNER, противопожарные муфты Rehau / Огракс / Огнеза"
+    },
+    "fire_fighting": {
+      "pumps": "Wilo, Grundfos",
+      "valves": "Задвижки с обрезиненным клином и электроприводом, клапаны обратные чугунные межфланцевые",
+      "pipe_fittings": "ГОСТ 3262-75 (водогазопроводные), ГОСТ 10704-91 (электросварные)",
+      "insulation": "-",
+      "additional": "Шкафы пожарные НПО Пульс (ШПК-Пульс), оросители СВУ/ДВУ (Спецавтоматика, Бийск)"
+    }
+  }
+}

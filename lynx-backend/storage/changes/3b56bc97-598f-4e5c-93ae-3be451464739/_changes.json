@@ -1,0 +1,390 @@
+{
+  "orders": [
+    {
+      "id": "bfc258df64c4",
+      "created_at": "2026-06-05T20:34:44.154794Z",
+      "title": "Приказ #1 (все замечания)",
+      "status": "applied",
+      "fixes": [
+        {
+          "id": "zs8ms50f8e8",
+          "source": "ai_check",
+          "source_index": 0,
+          "element_name": "",
+          "element_ids": [],
+          "message": "Материал труб холодного водоснабжения не соответствует требованиям ТЗ.",
+          "details": "ТЗ требует использование труб ПП PN20 неармированных и ПП PN25 армированных стекловолокном. В модели присутствуют трубы из стали и других материалов, что не соответствует требованиям ТЗ.",
+          "severity": "error",
+          "rule_key": "viv.ai.water_supply.material",
+          "status": "approved",
+          "actions": [],
+          "created_at": "2026-06-05T20:34:41.191Z",
+          "instruction": "Инструкция по исправлению: Материал труб холодного водоснабжения не соответствует требованиям ТЗ.\nЭлемент: \nПравило: viv.ai.water_supply.material\nДополнительно: ТЗ требует использование труб ПП PN20 неармированных и ПП PN25 армированных стекловолокном. В модели присутствуют трубы из стали и других материалов, что не соответствует требованиям ТЗ.\n\nПрограммные шаги:\n  1. Установить параметр BRU_Материал = ПП",
+          "steps": [
+            {
+              "action": "set_param",
+              "param": "BRU_Материал",
+              "value": "ПП",
+              "value_type": "string"
+            }
+          ],
+          "elaborated": true
+        },
+        {
+          "id": "3e232fohg0t",
+          "source": "ai_check",
+          "source_index": 1,
+          "element_name": "",
+          "element_ids": [],
+          "message": "Диаметр труб холодного водоснабжения превышает допустимые значения.",
+          "details": "В модели присутствуют трубы с диаметром DN4630, что значительно превышает максимальный допустимый диаметр DN63, указанный в ТЗ.",
+          "severity": "error",
+          "rule_key": "viv.ai.water_supply.diameter",
+          "status": "rejected",
+          "actions": [],
+          "created_at": "2026-06-05T20:34:41.191Z",
+          "instruction": "Инструкция по исправлению: Диаметр труб холодного водоснабжения превышает допустимые значения.\nЭлемент: \nПравило: viv.ai.water_supply.diameter\nДополнительно: В модели присутствуют трубы с диаметром DN4630, что значительно превышает максимальный допустимый диаметр DN63, указанный в ТЗ.\n\nПрограммные шаги:\n  1. Установить параметр BRU_Диаметр = 4630",
+          "steps": [
+            {
+              "action": "set_param",
+              "param": "BRU_Диаметр",
+              "value": "4630",
+              "value_type": "number"
+            }
+          ],
+          "elaborated": true
+        },
+        {
+          "id": "7zlbiym2bho",
+          "source": "ai_check",
+          "source_index": 2,
+          "element_name": "",
+          "element_ids": [],
+          "message": "Отсутствует тепловая изоляция для труб холодного водоснабжения.",
+          "details": "ТЗ требует тепловую изоляцию из вспененного каучука толщиной 13 мм для труб холодного водоснабжения, но в модели не указана изоляция для большинства труб.",
+          "severity": "error",
+          "rule_key": "viv.ai.water_supply.insulation",
+          "status": "approved",
+          "actions": [],
+          "created_at": "2026-06-05T20:34:41.191Z",
+          "instruction": "Инструкция по исправлению: Отсутствует тепловая изоляция для труб холодного водоснабжения.\nЭлемент: \nПравило: viv.ai.water_supply.insulation\nДополнительно: ТЗ требует тепловую изоляцию из вспененного каучука толщиной 13 мм для труб холодного водоснабжения, но в модели не указана изоляция для большинства труб.\n\nПрограммные шаги:\n  1. Установить параметр BRU_ТипИзоляции = каучук\n  2. Установить параметр BRU_ДиаметрИзоляции = 13",
+          "steps": [
+            {
+              "action": "set_param",
+              "param": "BRU_ТипИзоляции",
+              "value": "каучук",
+              "value_type": "string"
+            },
+            {
+              "action": "set_param",
+              "param": "BRU_ДиаметрИзоляции",
+              "value": "13",
+              "value_type": "number"
+            }
+          ],
+          "elaborated": true
+        },
+        {
+          "id": "d82ddye1xen",
+          "source": "ai_check",
+          "source_index": 3,
+          "element_name": "",
+          "element_ids": [],
+          "message": "Материал труб канализации не соответствует требованиям ТЗ.",
+          "details": "ТЗ требует использование труб ПП раструбных для бытовой канализации и чугунных безраструбных SML для канализации свыше 75м. В модели присутствуют трубы из стали и других материалов.",
+          "severity": "error",
+          "rule_key": "viv.ai.sewerage.material",
+          "status": "approved",
+          "actions": [],
+          "created_at": "2026-06-05T20:34:41.191Z",
+          "instruction": "Инструкция по исправлению: Материал труб канализации не соответствует требованиям ТЗ.\nЭлемент: \nПравило: viv.ai.sewerage.material\nДополнительно: ТЗ требует использование труб ПП раструбных для бытовой канализации и чугунных безраструбных SML для канализации свыше 75м. В модели присутствуют трубы из стали и других материалов.\n\nПрограммные шаги:\n  1. Установить параметр BRU_Материал = ПП",
+          "steps": [
+            {
+              "action": "set_param",
+              "param": "BRU_Материал",
+              "value": "ПП",
+              "value_type": "string"
+            }
+          ],
+          "elaborated": true
+        },
+        {
+          "id": "fjeanpy51wk",
+          "source": "ai_check",
+          "source_index": 4,
+          "element_name": "",
+          "element_ids": [],
+          "message": "Диаметр труб канализации не соответствует требованиям ТЗ.",
+          "details": "В модели присутствуют трубы с диаметрами, которые не соответствуют минимальным требованиям ТЗ, например, DN38 и DN32 для стояков.",
+          "severity": "error",
+          "rule_key": "viv.ai.sewerage.diameter",
+          "status": "rejected",
+          "actions": [],
+          "created_at": "2026-06-05T20:34:41.191Z",
+          "instruction": "Инструкция по исправлению: Диаметр труб канализации не соответствует требованиям ТЗ.\nЭлемент: \nПравило: viv.ai.sewerage.diameter\nДополнительно: В модели присутствуют трубы с диаметрами, которые не соответствуют минимальным требованиям ТЗ, например, DN38 и DN32 для стояков.\n\nПрограммные шаги:\n  1. Установить параметр BRU_Диаметр = 38",
+          "steps": [
+            {
+              "action": "set_param",
+              "param": "BRU_Диаметр",
+              "value": "38",
+              "value_type": "number"
+            }
+          ],
+          "elaborated": true
+        },
+        {
+          "id": "4vm7mibx02h",
+          "source": "ai_check",
+          "source_index": 5,
+          "element_name": "",
+          "element_ids": [],
+          "message": "Материал труб пожаротушения не соответствует требованиям ТЗ.",
+          "details": "ТЗ требует использование стальных труб водогазопроводных и электросварных. В модели присутствуют трубы из других материалов, таких как нержавеющая сталь.",
+          "severity": "error",
+          "rule_key": "viv.ai.fire_safety.material",
+          "status": "rejected",
+          "actions": [],
+          "created_at": "2026-06-05T20:34:41.191Z",
+          "instruction": "Инструкция по исправлению: Материал труб пожаротушения не соответствует требованиям ТЗ.\nЭлемент: \nПравило: viv.ai.fire_safety.material\nДополнительно: ТЗ требует использование стальных труб водогазопроводных и электросварных. В модели присутствуют трубы из других материалов, таких как нержавеющая сталь.\n\nПрограммные шаги:\n  1. Установить параметр BRU_Материал = сталь",
+          "steps": [
+            {
+              "action": "set_param",
+              "param": "BRU_Материал",
+              "value": "сталь",
+              "value_type": "string"
+            }
+          ],
+          "elaborated": true
+        },
+        {
+          "id": "kcgq797sfkc",
+          "source": "ai_check",
+          "source_index": 6,
+          "element_name": "",
+          "element_ids": [],
+          "message": "Диаметр стояков пожаротушения не соответствует требованиям ТЗ.",
+          "details": "ТЗ требует диаметр стояков не менее 50 мм, в модели присутствуют стояки с диаметрами DN15 и DN57, что не соответствует требованиям.",
+          "severity": "error",
+          "rule_key": "viv.ai.fire_safety.diameter",
+          "status": "rejected",
+          "actions": [],
+          "created_at": "2026-06-05T20:34:41.191Z",
+          "instruction": "Инструкция по исправлению: Диаметр стояков пожаротушения не соответствует требованиям ТЗ.\nЭлемент: \nПравило: viv.ai.fire_safety.diameter\nДополнительно: ТЗ требует диаметр стояков не менее 50 мм, в модели присутствуют стояки с диаметрами DN15 и DN57, что не соответствует требованиям.\n\nПрограммные шаги:\n  1. Установить параметр BRU_Диаметр = 50",
+          "steps": [
+            {
+              "action": "set_param",
+              "param": "BRU_Диаметр",
+              "value": "50",
+              "value_type": "number"
+            }
+          ],
+          "elaborated": true
+        },
+        {
+          "id": "34q3ynyiouc",
+          "source": "ai_check",
+          "source_index": 7,
+          "element_name": "",
+          "element_ids": [],
+          "message": "Отсутствует информация о защите от замерзания для труб пожаротушения.",
+          "details": "ТЗ не требует тепловой изоляции, но необходимо учитывать защиту от замерзания, что не указано в модели.",
+          "severity": "warning",
+          "rule_key": "viv.ai.fire_safety.insulation",
+          "status": "rejected",
+          "actions": [],
+          "created_at": "2026-06-05T20:34:41.191Z",
+          "instruction": "Инструкция по исправлению: Отсутствует информация о защите от замерзания для труб пожаротушения.\nЭлемент: \nПравило: viv.ai.fire_safety.insulation\nДополнительно: ТЗ не требует тепловой изоляции, но необходимо учитывать защиту от замерзания, что не указано в модели.\n\nПрограммные шаги:\n  1. Установить параметр BRU_ТипИзоляции = K-Flex\n  2. Установить параметр BRU_ДиаметрИзоляции = 50",
+          "steps": [
+            {
+              "action": "set_param",
+              "param": "BRU_ТипИзоляции",
+              "value": "K-Flex",
+              "value_type": "string"
+            },
+            {
+              "action": "set_param",
+              "param": "BRU_ДиаметрИзоляции",
+              "value": "50",
+              "value_type": "number"
+            }
+          ],
+          "elaborated": true
+        },
+        {
+          "id": "75qfky4zo18",
+          "source": "ai_check",
+          "source_index": 8,
+          "element_name": "",
+          "element_ids": [],
+          "message": "Не удалось определить материал элементов, невозможно проверить соответствие ТЗ.",
+          "details": "У большинства элементов в системе водоснабжения материал не указан, что затрудняет проверку соответствия ТЗ.",
+          "severity": "warning",
+          "rule_key": "viv.ai.general.empty_parameters",
+          "status": "rejected",
+          "actions": [],
+          "created_at": "2026-06-05T20:34:41.191Z",
+          "instruction": "Инструкция по исправлению: Не удалось определить материал элементов, невозможно проверить соответствие ТЗ.\nЭлемент: \nПравило: viv.ai.general.empty_parameters\nДополнительно: У большинства элементов в системе водоснабжения материал не указан, что затрудняет проверку соответствия ТЗ.\n\nПрограммные шаги:\n  1. Установить параметр BRU_Материал = -\n  2. Назначить систему —",
+          "steps": [
+            {
+              "action": "set_param",
+              "param": "BRU_Материал",
+              "value": "-",
+              "value_type": "string"
+            },
+            {
+              "action": "set_system",
+              "system_name": "—"
+            }
+          ],
+          "elaborated": true
+        },
+        {
+          "id": "2md5rx0r6gc",
+          "source": "rule_based",
+          "element_name": "",
+          "element_ids": [
+            "0yQYiMZaT9JRPSAQQHpDv7"
+          ],
+          "message": "Размер элемента не указан",
+          "details": "",
+          "severity": "error",
+          "rule_key": "viv.pipe.diameter.exists",
+          "status": "approved",
+          "actions": [],
+          "created_at": "2026-06-05T20:34:41.191Z",
+          "instruction": "Инструкция по исправлению: Размер элемента не указан\nЭлемент: \nПравило: viv.pipe.diameter.exists\n\nПрограммные шаги не определены — требуются уточнения.\n1. Откройте Revit и найдите элемент.\n2. Исправьте вручную согласно описанию замечания.",
+          "steps": [],
+          "elaborated": true
+        },
+        {
+          "id": "nia5l4rsyu",
+          "source": "rule_based",
+          "element_name": "",
+          "element_ids": [
+            "0yQYiMZaT9JRPSAQQHpDv7"
+          ],
+          "message": "Система не указана",
+          "details": "",
+          "severity": "error",
+          "rule_key": "viv.pipe.system.required",
+          "status": "approved",
+          "actions": [],
+          "created_at": "2026-06-05T20:34:41.191Z",
+          "instruction": "Инструкция по исправлению: Система не указана\nЭлемент: \nПравило: viv.pipe.system.required\n\nПрограммные шаги:\n  1. Назначить систему —",
+          "steps": [
+            {
+              "action": "set_system",
+              "system_name": "—"
+            }
+          ],
+          "elaborated": true
+        },
+        {
+          "id": "mmo4yztgqwl",
+          "source": "rule_based",
+          "element_name": "",
+          "element_ids": [
+            "0yQYiMZaT9JRPSAQQHpDv7"
+          ],
+          "message": "Секция не указана",
+          "details": "",
+          "severity": "error",
+          "rule_key": "viv.param.section",
+          "status": "rejected",
+          "actions": [],
+          "created_at": "2026-06-05T20:34:41.191Z",
+          "instruction": "Инструкция по исправлению: Секция не указана\nЭлемент: \nПравило: viv.param.section\n\nПрограммные шаги не определены — требуются уточнения.\n1. Откройте Revit и найдите элемент.\n2. Исправьте вручную согласно описанию замечания.",
+          "steps": [],
+          "elaborated": true
+        },
+        {
+          "id": "90idjchy11m",
+          "source": "rule_based",
+          "element_name": "",
+          "element_ids": [
+            "0yQYiMZaT9JRPSAQQHpDv7"
+          ],
+          "message": "Часть системы не указана",
+          "details": "",
+          "severity": "error",
+          "rule_key": "viv.param.part",
+          "status": "approved",
+          "actions": [],
+          "created_at": "2026-06-05T20:34:41.191Z",
+          "instruction": "Инструкция по исправлению: Часть системы не указана\nЭлемент: \nПравило: viv.param.part\n\nПрограммные шаги:\n  1. Назначить систему —",
+          "steps": [
+            {
+              "action": "set_system",
+              "system_name": "—"
+            }
+          ],
+          "elaborated": true
+        },
+        {
+          "id": "dsykzd4ljvs",
+          "source": "rule_based",
+          "element_name": "",
+          "element_ids": [
+            "0yQYiMZaT9JRPSAQQHpDv7"
+          ],
+          "message": "Система не указана",
+          "details": "",
+          "severity": "error",
+          "rule_key": "viv.param.system",
+          "status": "approved",
+          "actions": [],
+          "created_at": "2026-06-05T20:34:41.191Z",
+          "instruction": "Инструкция по исправлению: Система не указана\nЭлемент: \nПравило: viv.param.system\n\nПрограммные шаги:\n  1. Назначить систему —",
+          "steps": [
+            {
+              "action": "set_system",
+              "system_name": "—"
+            }
+          ],
+          "elaborated": true
+        },
+        {
+          "id": "5pfp5dtnsa4",
+          "source": "rule_based",
+          "element_name": "",
+          "element_ids": [
+            "0yQYiMZaT9JRPSAQQHpDv7"
+          ],
+          "message": "Этаж не указан",
+          "details": "",
+          "severity": "error",
+          "rule_key": "viv.param.storey",
+          "status": "rejected",
+          "actions": [],
+          "created_at": "2026-06-05T20:34:41.191Z",
+          "instruction": "Инструкция по исправлению: Этаж не указан\nЭлемент: \nПравило: viv.param.storey\n\nПрограммные шаги не определены — требуются уточнения.\n1. Откройте Revit и найдите элемент.\n2. Исправьте вручную согласно описанию замечания.",
+          "steps": [],
+          "elaborated": true
+        },
+        {
+          "id": "q5stqa5h4i",
+          "source": "rule_based",
+          "element_name": "",
+          "element_ids": [
+            "0yQYiMZaT9JRPSAQQHpDv7"
+          ],
+          "message": "CUBE_Сокращение для системы не указано",
+          "details": "",
+          "severity": "error",
+          "rule_key": "viv.param.cube_short",
+          "status": "approved",
+          "actions": [],
+          "created_at": "2026-06-05T20:34:41.191Z",
+          "instruction": "Инструкция по исправлению: CUBE_Сокращение для системы не указано\nЭлемент: \nПравило: viv.param.cube_short\n\nПрограммные шаги:\n  1. Назначить систему —",
+          "steps": [
+            {
+              "action": "set_system",
+              "system_name": "—"
+            }
+          ],
+          "elaborated": true
+        }
+      ]
+    }
+  ]
+}

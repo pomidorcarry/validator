@@ -28,7 +28,7 @@ def load_raw(element_id: str) -> dict:
     p = _get_dir() / f"{element_id}_raw.json"
     if p.exists():
         try:
-            return json.loads(p.read_text())
+            return json.loads(p.read_text(encoding="utf-8"))
         except Exception:
             return {}
     return {}
@@ -38,7 +38,7 @@ def load_norm(element_id: str) -> dict:
     p = _get_dir() / f"{element_id}_norm.json"
     if p.exists():
         try:
-            return json.loads(p.read_text())
+            return json.loads(p.read_text(encoding="utf-8"))
         except Exception:
             return {}
     return {}

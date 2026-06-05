@@ -15,6 +15,7 @@ async def upload_model(
     project_id: str = Form(...),
     model_name: str = Form(...),
     ruleset_id: str = Form(...),
+    element_id_map: str = Form("{}"),
 ):
     if not file.filename.lower().endswith(".ifc"):
         raise HTTPException(status_code=400, detail="Only IFC files allowed")
@@ -27,6 +28,17 @@ async def upload_model(
     with dst.open("wb") as f:
         content = await file.read()
         f.write(content)
+
+    # Save Revit element ID map (GlobalId → Revit ElementId)
+    import json
+    try:
+        revit_map = json.loads(element_id_map)
+    except json.JSONDecodeError:
+        revit_map = {}
+    if revit_map:
+        map_path = storage_dir / f"{model_version_id}.revit_ids.json"
+        with open(map_path, "w", encoding="utf-8") as f:
+            json.dump(revit_map, f, ensure_ascii=False)
 
     from ...services.ifc_normalizer import process_model_version
     from ...db.models import create_model_version, list_projects as _list_projects
@@ -148,6 +160,14 @@ async def get_model_elements(model_version_id: str):
 
     elements = await get_elements(model_version_id)
     return {"elements": elements, "count": len(elements)}
+
+
+@router.post("/models/{model_version_id}/repair-materials")
+async def repair_materials(model_version_id: str):
+    from ...services.ifc_normalizer import repair_materials as _repair
+
+    count = await _repair(model_version_id)
+    return {"model_version_id": model_version_id, "elements_updated": count}
 
 
 @router.post("/models/{model_version_id}/reprocess-rules")

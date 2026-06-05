@@ -1,0 +1,11 @@
+﻿python : INFO:     Started server process [30488]
+At line:1 char:51
++ ... HONPATH = $d; python -m uvicorn app.main:app --port 8000 2>&1 | Out-F ...
++                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (INFO:     Started server process [30488]:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:61060 - "GET /api/v1/health HTTP/1.1" 200 OK

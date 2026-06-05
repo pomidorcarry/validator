@@ -1,0 +1,71 @@
+{
+  "rule_key": "viv.ai.water_supply.material",
+  "severity": "error",
+  "message": "Материал элементов водоснабжения не соответствует требованиям ТЗ.",
+  "details": "ТЗ требует, чтобы магистрали водоснабжения были выполнены только из сшитого полиэтилена, однако в модели присутствуют элементы с материалами, не соответствующими этому требованию.",
+  "element_ids": [
+    "0HY_IjFCr11x",
+    "0HY_IjFCr11x",
+    "0HY_IjFCr11x",
+    "0HY_IjFCr11x",
+    "0HY_IjFCr11x",
+    "0HY_IjFCr11x",
+    "0HY_IjFCr11x",
+    "0HY_IjFCr11x",
+    "0HY_IjFCr11x",
+    "0HY_IjFCr11x"
+  ],
+  "dismissed": false
+}
+
+{
+  "rule_key": "viv.ai.water_supply.diameter",
+  "severity": "error",
+  "message": "Диаметры элементов водоснабжения выходят за диапазон, указанный в ТЗ.",
+  "details": "Некоторые элементы имеют диаметры, которые не соответствуют минимальным требованиям для магистралей водоснабжения.",
+  "element_ids": [
+    "0HY_IjFCr11x",
+    "0HY_IjFCr11x",
+    "0HY_IjFCr11x",
+    "0HY_IjFCr11x",
+    "0HY_IjFCr11x",
+    "0HY_IjFCr11x"
+  ],
+  "dismissed": false
+}
+
+{
+  "rule_key": "viv.ai.water_supply.insulation",
+  "severity": "warning",
+  "message": "Отсутствует изоляция для труб горячего водоснабжения.",
+  "details": "Требуется тепловая изоляция для труб горячего водоснабжения, однако в модели не указано наличие изоляции.",
+  "element_ids": [],
+  "dismissed": false
+}
+
+{
+  "rule_key": "viv.ai.water_supply.empty_parameters",
+  "severity": "warning",
+  "message": "Не удалось определить материал элементов, невозможно проверить соответствие ТЗ.",
+  "details": "У большинства элементов в системе водоснабжения материал не указан, что затрудняет проверку соответствия ТЗ.",
+  "element_ids": [],
+  "dismissed": false
+}
+
+{
+  "rule_key": "viv.ai.sewerage.empty_parameters",
+  "severity": "warning",
+  "message": "Не удалось определить материал элементов канализации, невозможно проверить соответствие ТЗ.",
+  "details": "У большинства элементов в системе водоотведения материал не указан, что затрудняет проверку соответствия ТЗ.",
+  "element_ids": [],
+  "dismissed": false
+}
+
+{
+  "rule_key": "viv.ai.fire_safety.empty_parameters",
+  "severity": "warning",
+  "message": "Не удалось определить материал элементов системы пожаротушения, невозможно проверить соответствие ТЗ.",
+  "details": "У большинства элементов в системе пожаротушения материал не указан, что затрудняет проверку соответствия ТЗ.",
+  "element_ids": [],
+  "dismissed": false
+}

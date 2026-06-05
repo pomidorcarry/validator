@@ -12,16 +12,14 @@ async def ai_status(check: bool = False):
 
     if configured and check:
         try:
-            import openai
-            client = openai.AsyncOpenAI(api_key=_cfg.openai_api_key)
-            await client.models.list()
-            result["responsive"] = True
-        except openai.PermissionDeniedError as e:
-            result["responsive"] = False
-            result["error_detail"] = "Регион не поддерживается (403)"
-        except openai.AuthenticationError as e:
-            result["responsive"] = False
-            result["error_detail"] = "Неверный API-ключ"
+            from ...services.ai.client import ai_chat
+            resp = await ai_chat(
+                [{"role": "user", "content": "echo OK"}],
+                temperature=0, max_tokens=5,
+            )
+            result["responsive"] = resp is not None and "OK" in resp
+            if not result["responsive"]:
+                result["error_detail"] = "AI ответил неожиданно"
         except Exception as e:
             result["responsive"] = False
             result["error_detail"] = str(e)[:200]

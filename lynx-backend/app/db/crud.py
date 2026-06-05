@@ -545,7 +545,7 @@ async def get_project_tz(project_id: str) -> Optional[dict]:
                     meta_file = f.with_name(f.name + ".meta")
                     if meta_file.exists():
                         try:
-                            meta = _json.loads(meta_file.read_text())
+                            meta = _json.loads(meta_file.read_text(encoding="utf-8"))
                             display_name = meta.get("original_name", f.stem)
                         except Exception:
                             pass
@@ -556,7 +556,16 @@ async def get_project_tz(project_id: str) -> Optional[dict]:
                         "uploaded_at": datetime.fromtimestamp(f.stat().st_mtime).isoformat(),
                     })
 
-        return {
+        result2 = await session.execute(
+            select(TzVersion)
+            .where(TzVersion.project_id == project_id)
+            .order_by(TzVersion.version.desc())
+            .limit(1)
+        )
+        latest_tz = result2.scalar_one_or_none()
+        tz_details = dict(latest_tz.data_jsonb) if latest_tz and isinstance(latest_tz.data_jsonb, dict) else {}
+
+        result = {
             "tz_general": p.tz_general or "",
             "tz_water_supply": p.tz_water_supply or "",
             "tz_sewerage": p.tz_sewerage or "",
@@ -568,7 +577,9 @@ async def get_project_tz(project_id: str) -> Optional[dict]:
             "bim_requirements": p.bim_requirements or "",
             "pipeline_data": p.pipeline_data or {},
             "tz_files": file_list,
+            "tz_details": tz_details,
         }
+        return result
 
 
 async def update_project_tz(project_id: str, data: dict, source: str = "manual") -> Optional[dict]:
@@ -597,22 +608,12 @@ async def update_project_tz(project_id: str, data: dict, source: str = "manual")
             select(func.count()).select_from(TzVersion).where(TzVersion.project_id == project_id)
         )
         ver_num = (version_result.scalar() or 0) + 1
-        tz_data = {
-            "tz_general": p.tz_general or "",
-            "tz_water_supply": p.tz_water_supply or "",
-            "tz_sewerage": p.tz_sewerage or "",
-            "tz_fire_fighting": p.tz_fire_fighting or "",
-            "tz_other": p.tz_other or "",
-            "project_address": p.project_address or "",
-            "sections_count": p.sections_count or "",
-            "floors_count": p.floors_count or "",
-            "bim_requirements": p.bim_requirements or "",
-            "pipeline_data": p.pipeline_data or {},
-        }
+        # Store the FULL data dict in data_jsonb (not just summary fields)
+        full_data = dict(data) if isinstance(data, dict) else {}
         session.add(TzVersion(
             project_id=project_id,
             version=ver_num,
-            data_jsonb=tz_data,
+            data_jsonb=full_data,
             source=source,
             file_name=p.tz_file_name,
         ))
@@ -667,7 +668,7 @@ async def get_ai_check_result(project_id: str) -> Optional[dict]:
     if not path.exists():
         return None
     try:
-        return _json.loads(path.read_text())
+        return _json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return None
 
