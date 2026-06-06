@@ -12,7 +12,7 @@ function escHtml(s) {
 window.escHtml = escHtml;
 
 function formatDate(s) {
-    try { return new Date(s).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' }); }
+    try { return new Date(s + 'Z').toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' }); }
     catch { return '-'; }
 }
 window.formatDate = formatDate;

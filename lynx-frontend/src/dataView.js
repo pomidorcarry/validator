@@ -18,6 +18,23 @@ window.showDataPage = function() {
     loadDataPage();
 };
 
+window.copyProjectId = function() {
+    var id = window.currentProjectId || '';
+    if (!id) { window.showToast('Нет активного проекта', 'error'); return; }
+    navigator.clipboard.writeText(id).then(function() {
+        window.showToast('Project ID скопирован: ' + id, 'success');
+    }).catch(function() {
+        // fallback for older browsers
+        var ta = document.createElement('textarea');
+        ta.value = id;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        window.showToast('Project ID скопирован: ' + id, 'success');
+    });
+};
+
 async function loadDataPage() {
     try {
         var pResp = await fetch(window.API_BASE + '/projects/' + window.currentProjectId);
@@ -111,73 +128,169 @@ window.switchDataTab = function(tab) {
     document.getElementById('dataCategoriesTab').style.display = tab === 'categories' ? '' : 'none';
     document.getElementById('dataTzTab').style.display = tab === 'tz' ? '' : 'none';
     document.getElementById('dataAiCheckTab').style.display = tab === 'ai-check' ? '' : 'none';
+    document.getElementById('aiCheckResults').style.display = tab === 'ai-check' ? '' : 'none';
+    document.getElementById('dataVendorTab').style.display = tab === 'vendor' ? '' : 'none';
+    document.getElementById('dataChangesTab').style.display = tab === 'changes' ? '' : 'none';
     document.querySelector('.categories-only').style.display = tab === 'categories' ? '' : 'none';
     document.querySelector('.tz-only').style.display = tab === 'tz' ? '' : 'none';
     document.querySelector('.ai-check-only').style.display = tab === 'ai-check' ? '' : 'none';
+    document.querySelector('.changes-only').style.display = tab === 'changes' ? '' : 'none';
     var labels = {
         'categories': 'Настройка категорий элементов модели',
         'tz': 'Редактирование технического задания',
         'ai-check': 'Проверка модели с использованием ИИ',
+        'vendor': 'Анализ рекомендуемых производителей',
+        'changes': 'Создание и отправка приказов на изменение модели в Revit',
     };
     document.getElementById('dataPageMeta').textContent = labels[tab] || '';
     if (tab === 'tz') loadTzSection();
     if (tab === 'ai-check') window.loadAiCheck();
+    if (tab === 'vendor') loadVendorSection();
+    if (tab === 'changes') window.loadChangesTab();
 };
 
 // ── TZ section: load, save, upload, AI parse ───────────────────
 
-var _activePipelineSys = 'water_supply';
+var _activePipelineSys = 'all';
 
 function _emptyPipeline() {
-    return {
-        water_supply: { mains: {}, risers: {}, distribution: {} },
-        sewerage: { mains: {}, risers: {}, distribution: {} },
-        fire_fighting: { mains: {}, risers: {}, distribution: {} },
-    };
+    return { systems: [] };
 }
 
-function _renderPipelineTable(sys) {
-    var sysLabels = { water_supply: 'Водоснабжение', sewerage: 'Водоотведение', fire_fighting: 'Пожаротушение' };
-    var sectionLabels = { mains: 'Магистрали', risers: 'Стояки', distribution: 'Разводка' };
-    var sections = ['mains', 'risers', 'distribution'];
-    var pd = window._tzPipelineData || _emptyPipeline();
-    var sysData = pd[sys] || {};
 
-    var tbody = document.getElementById('pipelineTbody');
-    tbody.innerHTML = sections.map(function(sec) {
-        var secData = sysData[sec] || {};
-        return '<tr>' +
-            '<td style="font-weight:600;white-space:nowrap">' + sectionLabels[sec] + '</td>' +
-            '<td><input class="pipe-mat" data-sys="' + sys + '" data-sec="' + sec + '" value="' + window.escHtml(secData.material || '') + '" placeholder="-"></td>' +
-            '<td><input class="pipe-dia" data-sys="' + sys + '" data-sec="' + sec + '" value="' + window.escHtml(secData.diameter || '') + '" placeholder="-"></td>' +
-            '<td><input class="pipe-ins" data-sys="' + sys + '" data-sec="' + sec + '" value="' + window.escHtml(secData.insulation || '') + '" placeholder="-"></td>' +
-        '</tr>';
+// ── Manufacturers helpers ──
+
+var _MFR_FIELDS = {};
+
+function _loadManufacturers(mfr) {
+    mfr = mfr || {};
+    _MFR_FIELDS = {};
+    var map = [
+        ['mfr_ws_pumps','water_supply','pumps'], ['mfr_ws_valves','water_supply','valves'],
+        ['mfr_ws_pipe','water_supply','pipe_fittings'], ['mfr_ws_insulation','water_supply','insulation'],
+        ['mfr_ws_manifold','water_supply','manifold'], ['mfr_ws_additional','water_supply','additional'],
+        ['mfr_sw_pumps','sewerage','pumps'], ['mfr_sw_valves','sewerage','valves'],
+        ['mfr_sw_pipe','sewerage','pipe_fittings'], ['mfr_sw_insulation','sewerage','insulation'],
+        ['mfr_sw_additional','sewerage','additional'],
+        ['mfr_ff_pumps','fire_fighting','pumps'], ['mfr_ff_valves','fire_fighting','valves'],
+        ['mfr_ff_pipe','fire_fighting','pipe_fittings'], ['mfr_ff_insulation','fire_fighting','insulation'],
+        ['mfr_ff_additional','fire_fighting','additional'],
+    ];
+    map.forEach(function(row) {
+        var elId = row[0], cat = row[1], key = row[2];
+        _MFR_FIELDS[elId] = [cat, key];
+        var el = document.getElementById(elId);
+        if (el) el.value = ((mfr[cat] && mfr[cat][key]) || '');
+    });
+}
+
+function _saveManufacturers() {
+    var mfr = { water_supply: {}, sewerage: {}, fire_fighting: {} };
+    for (var elId in _MFR_FIELDS) {
+        var el = document.getElementById(elId);
+        if (!el) continue;
+        var cat = _MFR_FIELDS[elId][0], key = _MFR_FIELDS[elId][1];
+        mfr[cat][key] = el.value;
+    }
+    return mfr;
+}
+
+function _renderPipelineSystems(filter) {
+    filter = filter || 'all';
+    var pd = window._tzPipelineData || _emptyPipeline();
+    var systems = pd.systems || [];
+    if (filter !== 'all') {
+        systems = systems.filter(function(s) { return s.category === filter; });
+    }
+    var catLabels = { water_supply: '🚰 Водоснабжение', sewerage: '🧪 Водоотведение', fire_fighting: '🔥 Пожаротушение' };
+    var container = document.getElementById('pipelineSystemsList');
+    if (!systems.length) {
+        container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-secondary);font-size:13px">Нет систем. Нажмите «+ Добавить систему»</div>';
+        return;
+    }
+    container.innerHTML = systems.map(function(sys) {
+        return '<div class="pipeline-system-card" data-sys-id="' + sys.id + '" style="background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:12px 16px">' +
+            '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">' +
+                '<span style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase">' + (catLabels[sys.category] || sys.category) + '</span>' +
+                '<button onclick="removePipelineSystem(\'' + sys.id + '\')" style="background:none;border:none;color:var(--text-danger, #ef4444);font-size:18px;cursor:pointer;padding:0 4px" title="Удалить систему">✕</button>' +
+            '</div>' +
+            '<div style="display:grid;grid-template-columns:1fr 2fr 2fr 2fr 2fr;gap:8px;align-items:end">' +
+                '<div><label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:2px">Система</label>' +
+                '<input class="pipe-sys-name" value="' + window.escHtml(sys.name || '') + '" placeholder="В1" style="width:100%;padding:6px 8px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:13px" /></div>' +
+                '<div><label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:2px">Материал</label>' +
+                '<input class="pipe-sys-mat" value="' + window.escHtml(sys.material || '') + '" placeholder="сталь, чугун..." style="width:100%;padding:6px 8px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:13px" /></div>' +
+                '<div><label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:2px">Диаметры</label>' +
+                '<input class="pipe-sys-dia" value="' + window.escHtml(sys.diameters || '') + '" placeholder="DN50, DN65..." style="width:100%;padding:6px 8px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:13px" /></div>' +
+                '<div><label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:2px">Изоляция</label>' +
+                '<input class="pipe-sys-ins" value="' + window.escHtml(sys.insulation || '') + '" placeholder="минвата 50мм..." style="width:100%;padding:6px 8px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:13px" /></div>' +
+                '<div><label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:2px">Прокладка</label>' +
+                '<input class="pipe-sys-lay" value="' + window.escHtml(sys.laying || '') + '" placeholder="подземная, надземная..." style="width:100%;padding:6px 8px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:13px" /></div>' +
+            '</div>' +
+        '</div>';
     }).join('');
 }
 
-function _readPipelineFromTable() {
-    var pd = _emptyPipeline();
-    document.querySelectorAll('#pipelineTbody input').forEach(function(inp) {
-        var sys = inp.getAttribute('data-sys');
-        var sec = inp.getAttribute('data-sec');
-        var cls = inp.className;
-        var val = inp.value;
-        if (!pd[sys]) pd[sys] = {};
-        if (!pd[sys][sec]) pd[sys][sec] = {};
-        if (cls.indexOf('pipe-mat') >= 0) pd[sys][sec].material = val;
-        else if (cls.indexOf('pipe-dia') >= 0) pd[sys][sec].diameter = val;
-        else if (cls.indexOf('pipe-ins') >= 0) pd[sys][sec].insulation = val;
+function _readPipelineSystems() {
+    var pd = JSON.parse(JSON.stringify(window._tzPipelineData || _emptyPipeline()));
+    var systems = [];
+    document.querySelectorAll('#pipelineSystemsList .pipeline-system-card').forEach(function(card) {
+        var id = card.getAttribute('data-sys-id');
+        var oldSys = (pd.systems || []).find(function(s) { return s.id === id; });
+        systems.push({
+            id: id,
+            category: oldSys ? oldSys.category : 'water_supply',
+            name: card.querySelector('.pipe-sys-name').value,
+            material: card.querySelector('.pipe-sys-mat').value,
+            diameters: card.querySelector('.pipe-sys-dia').value,
+            insulation: card.querySelector('.pipe-sys-ins').value,
+            laying: card.querySelector('.pipe-sys-lay').value,
+        });
     });
-    return pd;
+    return { systems: systems };
+}
+
+// Sync only visible cards' values from DOM into _tzPipelineData
+// without touching hidden systems (avoids losing them on tab switch)
+function _saveVisibleToMemory() {
+    var all = window._tzPipelineData;
+    if (!all) return;
+    document.querySelectorAll('#pipelineSystemsList .pipeline-system-card').forEach(function(card) {
+        var id = card.getAttribute('data-sys-id');
+        var match = (all.systems || []).find(function(s) { return s.id === id; });
+        if (match) {
+            match.name = card.querySelector('.pipe-sys-name').value;
+            match.material = card.querySelector('.pipe-sys-mat').value;
+            match.diameters = card.querySelector('.pipe-sys-dia').value;
+            match.insulation = card.querySelector('.pipe-sys-ins').value;
+            match.laying = card.querySelector('.pipe-sys-lay').value;
+        }
+    });
 }
 
 window.switchPipelineTab = function(sys) {
+    _saveVisibleToMemory();
     _activePipelineSys = sys;
     document.querySelectorAll('.pipeline-tab').forEach(function(t) {
         t.classList.toggle('active', t.getAttribute('data-sys') === sys);
     });
-    _readPipelineFromTable();
-    _renderPipelineTable(sys);
+    _renderPipelineSystems(sys);
+};
+
+window.addPipelineSystem = function() {
+    if (!window._tzPipelineData) window._tzPipelineData = _emptyPipeline();
+    if (!window._tzPipelineData.systems) window._tzPipelineData.systems = [];
+    var cat = document.getElementById('newSystemCategory').value;
+    var newId = 'sys_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+    window._tzPipelineData.systems.push({ id: newId, category: cat, name: '', material: '', diameters: '', insulation: '', laying: '' });
+    _renderPipelineSystems(_activePipelineSys);
+};
+
+window.removePipelineSystem = function(id) {
+    if (!confirm('Удалить систему?')) return;
+    if (!window._tzPipelineData) window._tzPipelineData = _emptyPipeline();
+    if (!window._tzPipelineData.systems) window._tzPipelineData.systems = [];
+    window._tzPipelineData.systems = window._tzPipelineData.systems.filter(function(s) { return s.id !== id; });
+    _renderPipelineSystems(_activePipelineSys);
 };
 
 var _tzFileList = [];
@@ -196,7 +309,7 @@ function _renderTzFileList() {
     btnParse.disabled = false;
     var html = _tzFileList.map(function(f) {
         var size = f.size_bytes < 1024 ? f.size_bytes + ' B' : (f.size_bytes / 1024).toFixed(1) + ' KB';
-        var date = f.uploaded_at ? new Date(f.uploaded_at).toLocaleString('ru-RU') : '';
+        var date = f.uploaded_at ? new Date(f.uploaded_at + 'Z').toLocaleString('ru-RU') : '';
         var selected = f.stored_name === _selectedTzFile;
         var label = f.display_name || f.stored_name;
         return '<label style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:4px;background:' + (selected ? 'var(--accent-light)' : 'transparent') + ';cursor:pointer">' +
@@ -204,7 +317,7 @@ function _renderTzFileList() {
             '<span style="flex:1;font-size:13px">' + window.escHtml(label) + '</span>' +
             '<span style="font-size:11px;color:var(--text-secondary)">' + size + '</span>' +
             '<span style="font-size:11px;color:var(--text-secondary)">' + date + '</span>' +
-            '<span style="cursor:pointer;color:var(--text-secondary);opacity:0.4;font-size:14px;padding:0 4px" onclick="event.stopPropagation();deleteTzFile(\'' + f.stored_name + '\')" title="Удалить файл">✕</span>' +
+            '<span style="cursor:pointer;color:var(--text-danger, #ef4444);font-size:16px;padding:0 6px;font-weight:bold" onclick="event.stopPropagation();deleteTzFile(\'' + f.stored_name + '\')" title="Удалить файл">✕</span>' +
         '</label>';
     }).join('');
     el.innerHTML = html;
@@ -233,11 +346,11 @@ async function loadTzSection() {
         document.getElementById('bimRequirements').value = data.bim_requirements || '';
 
         window._tzPipelineData = data.pipeline_data || _emptyPipeline();
-        _activePipelineSys = 'water_supply';
+        _activePipelineSys = 'all';
         document.querySelectorAll('.pipeline-tab').forEach(function(t) {
-            t.classList.toggle('active', t.getAttribute('data-sys') === 'water_supply');
+            t.classList.toggle('active', t.getAttribute('data-sys') === 'all');
         });
-        _renderPipelineTable(_activePipelineSys);
+        _renderPipelineSystems(_activePipelineSys);
 
         // File list
         _tzFileList = data.tz_files || [];
@@ -265,7 +378,7 @@ async function loadTzHistory() {
         var sourceLabels = { ai: 'AI', manual: 'Вручную', upload: 'Загрузка' };
         list.innerHTML = data.versions.map(function(v) {
             var src = sourceLabels[v.source] || v.source;
-            var date = v.created_at ? new Date(v.created_at).toLocaleString('ru-RU') : '';
+            var date = v.created_at ? new Date(v.created_at + 'Z').toLocaleString('ru-RU') : '';
             return '<div class="tz-history-item">' +
                 '<span>Версия ' + v.version + '</span>' +
                 '<span class="tz-history-source">' + src + '</span>' +
@@ -276,7 +389,8 @@ async function loadTzHistory() {
 }
 
 window.saveTzSection = async function() {
-    _readPipelineFromTable();
+    // Merge visible card values into memory, keep hidden systems intact
+    _saveVisibleToMemory();
     var data = {
         tz_general: document.getElementById('tzGeneral').value,
         tz_water_supply: document.getElementById('tzWaterSupply').value,
@@ -287,7 +401,7 @@ window.saveTzSection = async function() {
         sections_count: document.getElementById('sectionsCount').value,
         floors_count: document.getElementById('floorsCount').value,
         bim_requirements: document.getElementById('bimRequirements').value,
-        pipeline_data: window._tzPipelineData || _emptyPipeline(),
+        pipeline_data: pd,
     };
     try {
         var resp = await fetch(window.API_BASE + '/projects/' + window.currentProjectId + '/tz', {
@@ -387,25 +501,25 @@ window.parseTzAi = async function() {
         html += '<div class="form-group"><label class="form-label" style="font-size:12px;text-transform:uppercase;color:var(--text-secondary)">Прочие</label>';
         html += '<textarea class="form-textarea preview-tz-field" id="pv_other" rows="2">' + window.escHtml(data.tz_other || '') + '</textarea></div>';
 
-        // Pipeline data preview - simple fields for each system
+        // Pipeline data preview — show individual systems
         var pd = data.pipeline_data || {};
-        var sysList = ['water_supply', 'sewerage', 'fire_fighting'];
-        var sysLabels = { water_supply: 'Водоснабжение', sewerage: 'Водоотведение', fire_fighting: 'Пожаротушение' };
-        var secLabels = { mains: 'Магистрали', risers: 'Стояки', distribution: 'Разводка' };
-        html += '<div style="margin-top:12px"><div style="font-size:12px;text-transform:uppercase;color:var(--text-secondary);font-weight:600;margin-bottom:8px">Трубопроводы</div>';
-        sysList.forEach(function(sys) {
-            var sysData = pd[sys] || {};
-            ['mains', 'risers', 'distribution'].forEach(function(sec) {
-                var s = sysData[sec] || {};
-                var mat = s.material || '';
-                var dia = s.diameter || '';
-                var ins = s.insulation || '';
-                if (mat || dia || ins) {
-                    html += '<div style="font-size:12px;margin-bottom:4px"><span style="color:var(--text-secondary)">' + sysLabels[sys] + ' / ' + secLabels[sec] + ':</span> ' +
-                        (mat ? 'мат: ' + window.escHtml(mat) : '') + (dia ? ', d: ' + window.escHtml(dia) : '') + (ins ? ', изол: ' + window.escHtml(ins) : '') + '</div>';
-                }
+        var systems = pd.systems || [];
+        var catLabels = { water_supply: '🚰 Водоснабжение', sewerage: '🧪 Водоотведение', fire_fighting: '🔥 Пожаротушение' };
+        html += '<div style="margin-top:12px"><div style="font-size:12px;text-transform:uppercase;color:var(--text-secondary);font-weight:600;margin-bottom:8px">Трубопроводные системы</div>';
+        if (systems.length) {
+            systems.forEach(function(sys, idx) {
+                html += '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap">' +
+                    '<span style="font-size:12px;font-weight:600;color:var(--accent);min-width:140px">' + (catLabels[sys.category] || sys.category) + '</span>' +
+                    '<input class="form-input preview-tz-field" id="pv_sys_' + idx + '_name" value="' + window.escHtml(sys.name || '') + '" placeholder="Система" style="max-width:100px" />' +
+                    '<input class="form-input preview-tz-field" id="pv_sys_' + idx + '_mat" value="' + window.escHtml(sys.material || '') + '" placeholder="Материал" style="max-width:140px" />' +
+                    '<input class="form-input preview-tz-field" id="pv_sys_' + idx + '_dia" value="' + window.escHtml(sys.diameters || '') + '" placeholder="Диаметры" style="max-width:140px" />' +
+                    '<input class="form-input preview-tz-field" id="pv_sys_' + idx + '_ins" value="' + window.escHtml(sys.insulation || '') + '" placeholder="Изоляция" style="max-width:140px" />' +
+                    '<input class="form-input preview-tz-field" id="pv_sys_' + idx + '_lay" value="' + window.escHtml(sys.laying || '') + '" placeholder="Прокладка" style="max-width:140px" />' +
+                '</div>';
             });
-        });
+        } else {
+            html += '<div style="font-size:12px;color:var(--text-secondary)">AI не определил системы</div>';
+        }
         html += '</div>';
 
         // Raw GPT response & prompt
@@ -449,16 +563,49 @@ window.applyTzPreview = function() {
             data[key] = fields[key];
         }
     }
-    var pd = window._tzPreviewData && window._tzPreviewData.pipeline_data;
-    if (pd) {
-        var hasData = false;
-        ['water_supply','sewerage','fire_fighting'].forEach(function(sys) {
-            ['mains','risers','distribution'].forEach(function(sec) {
-                var s = (pd[sys]||{})[sec]||{};
-                if (s.material || s.diameter || s.insulation) hasData = true;
+    var pdPreview = window._tzPreviewData && window._tzPreviewData.pipeline_data;
+    if (pdPreview) {
+        var previewSystems = pdPreview.systems || [];
+        // Read AI systems from preview modal (user may have edited them)
+        var aiSystems = [];
+        previewSystems.forEach(function(sys, idx) {
+            var nameEl = document.getElementById('pv_sys_' + idx + '_name');
+            if (!nameEl) return;
+            aiSystems.push({
+                id: sys.id || '',
+                category: sys.category || 'water_supply',
+                name: nameEl.value,
+                material: (document.getElementById('pv_sys_' + idx + '_mat') || {}).value || '-',
+                diameters: (document.getElementById('pv_sys_' + idx + '_dia') || {}).value || '-',
+                insulation: (document.getElementById('pv_sys_' + idx + '_ins') || {}).value || '-',
+                laying: (document.getElementById('pv_sys_' + idx + '_lay') || {}).value || '-',
             });
         });
-        if (hasData) data.pipeline_data = pd;
+        if (aiSystems.length) {
+            // Merge with existing systems — skip if name+category already exists
+            var existing = window._tzPipelineData || { systems: [] };
+            if (!existing.systems) existing.systems = [];
+            var existingKeys = {};
+            existing.systems.forEach(function(s) {
+                existingKeys[s.category + '|' + s.name] = true;
+            });
+            aiSystems.forEach(function(aiSys) {
+                var key = aiSys.category + '|' + aiSys.name;
+                if (!existingKeys[key]) {
+                    existing.systems.push({
+                        id: aiSys.id || ('sys_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6)),
+                        category: aiSys.category,
+                        name: aiSys.name,
+                        material: aiSys.material,
+                        diameters: aiSys.diameters,
+                        insulation: aiSys.insulation,
+                        laying: aiSys.laying,
+                    });
+                }
+            });
+            var hasAny = existing.systems.some(function(s) { return s.name && s.name !== '-'; });
+            if (hasAny) data.pipeline_data = existing;
+        }
     }
 
     if (Object.keys(data).length === 0) {
@@ -675,5 +822,189 @@ window.saveCategories = async function() {
         countCategoryElements();
     } catch (e) {
         window.showToast('Ошибка: ' + e.message, 'error');
+    }
+};
+
+// ── Vendor section ─────────────────────────────────────────────
+
+var _vendorFiles = [];
+var _selectedVendorFile = '';
+var _vendorResult = null;
+
+function _renderVendorFileList() {
+    var el = document.getElementById('vendorFileList');
+    var btnParse = document.getElementById('btnParseVendor');
+    var btnDl = document.getElementById('btnDownloadVendor');
+    if (!_vendorFiles.length) {
+        el.innerHTML = 'Файлов нет — загрузите PDF или Excel с ведомостью производителей';
+        btnParse.disabled = true;
+        btnDl.style.display = 'none';
+        return;
+    }
+    btnParse.disabled = false;
+    var html = _vendorFiles.map(function(f) {
+        var size = f.size_bytes < 1024 ? f.size_bytes + ' B' : (f.size_bytes / 1024).toFixed(1) + ' KB';
+        var date = f.uploaded_at ? new Date(f.uploaded_at + 'Z').toLocaleString('ru-RU') : '';
+        var selected = f.stored_name === _selectedVendorFile;
+        var label = f.display_name || f.stored_name;
+        return '<label style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:4px;background:' + (selected ? 'var(--accent-light)' : 'transparent') + ';cursor:pointer">' +
+            '<input type="radio" name="vendorFile" value="' + f.stored_name + '" ' + (selected ? 'checked' : '') + ' onchange="selectVendorFile(\'' + f.stored_name + '\')" />' +
+            '<span style="flex:1;font-size:13px">' + window.escHtml(label) + '</span>' +
+            '<span style="font-size:11px;color:var(--text-secondary)">' + size + '</span>' +
+            '<span style="font-size:11px;color:var(--text-secondary)">' + date + '</span>' +
+            '<span style="cursor:pointer;color:var(--text-secondary);opacity:0.4;font-size:14px;padding:0 4px" onclick="event.stopPropagation();deleteVendorFile(\'' + f.stored_name + '\')" title="Удалить">✕</span>' +
+        '</label>';
+    }).join('');
+    el.innerHTML = html;
+    btnDl.style.display = _selectedVendorFile ? '' : 'none';
+}
+
+window.selectVendorFile = function(storedName) {
+    _selectedVendorFile = storedName;
+    _renderVendorFileList();
+};
+
+window.uploadVendorFile = async function(file) {
+    if (!file) return;
+    var form = new FormData();
+    form.append('file', file);
+    try {
+        var resp = await fetch(window.API_BASE + '/projects/' + window.currentProjectId + '/vendor/upload', {
+            method: 'POST',
+            body: form,
+        });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        window.showToast('Файл загружен', 'success');
+        await loadVendorSection();
+    } catch (e) {
+        window.showToast('Ошибка загрузки: ' + e.message, 'error');
+    }
+};
+
+window.downloadVendorFile = function() {
+    if (!_selectedVendorFile) return;
+    window.open(window.API_BASE + '/projects/' + window.currentProjectId + '/vendor/file?filename=' + encodeURIComponent(_selectedVendorFile), '_blank');
+};
+
+window.deleteVendorFile = async function(storedName) {
+    if (!confirm('Удалить файл ' + storedName + '?')) return;
+    try {
+        var resp = await fetch(window.API_BASE + '/projects/' + window.currentProjectId + '/vendor/files?filename=' + encodeURIComponent(storedName), {
+            method: 'DELETE',
+        });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        if (_selectedVendorFile === storedName) _selectedVendorFile = '';
+        window.showToast('Файл удалён', 'success');
+        await loadVendorSection();
+    } catch (e) {
+        window.showToast('Ошибка удаления: ' + e.message, 'error');
+    }
+};
+
+window.parseVendorAi = async function() {
+    var btn = document.getElementById('btnParseVendor');
+    if (!_selectedVendorFile) {
+        window.showToast('Выберите файл для анализа', 'error');
+        return;
+    }
+    btn.disabled = true;
+    btn.textContent = '⏳ Анализ...';
+    try {
+        var url = window.API_BASE + '/projects/' + window.currentProjectId + '/vendor/parse?filename=' + encodeURIComponent(_selectedVendorFile);
+        var resp = await fetch(url, { method: 'POST' });
+        if (!resp.ok) {
+            var errBody = '';
+            try { var errJson = await resp.json(); errBody = errJson.detail || JSON.stringify(errJson); } catch(e2) { errBody = await resp.text(); }
+            throw new Error(errBody || 'HTTP ' + resp.status);
+        }
+        var parsed = await resp.json();
+        _vendorResult = {};
+        for (var k in parsed) {
+            if (k === '_manufacturers') continue;
+            _vendorResult[k] = parsed[k];
+        }
+        _renderVendorResult();
+        if (parsed._manufacturers) {
+            _loadManufacturers(parsed._manufacturers);
+        }
+        window.showToast('Анализ завершён', 'success');
+    } catch (e) {
+        window.showToast('Ошибка анализа: ' + e.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '⚡ Проанализировать производителей';
+    }
+};
+
+function _renderVendorResult() {
+    var el = document.getElementById('vendorResult');
+    if (!_vendorResult || Object.keys(_vendorResult).length === 0) {
+        el.innerHTML = '<div class="empty-message">Нет данных. Загрузите файл и нажмите "Проанализировать".</div>';
+        return;
+    }
+
+    var html = '';
+    var sections = [
+        { key: 'general_notes', label: 'Общие указания' },
+        { key: 'water_supply_manufacturers', label: '🚰 Водоснабжение' },
+        { key: 'sewerage_manufacturers', label: '🧪 Водоотведение' },
+        { key: 'fire_fighting_manufacturers', label: '🔥 Пожаротушение' },
+        { key: 'heating_manufacturers', label: '🌡 Отопление' },
+        { key: 'ventilation_manufacturers', label: '💨 Вентиляция и кондиционирование' },
+        { key: 'electrical_manufacturers', label: '⚡ Электроснабжение' },
+        { key: 'low_current_manufacturers', label: '🔌 Слаботочные системы' },
+        { key: 'pumps_manufacturers', label: '🔄 Насосное оборудование' },
+        { key: 'valves_manufacturers', label: '🔧 Запорно-регулирующая арматура' },
+        { key: 'insulation_manufacturers', label: '📦 Изоляционные материалы' },
+        { key: 'water_treatment_manufacturers', label: '💧 Водоподготовка' },
+        { key: 'automation_manufacturers', label: '🤖 Автоматизация' },
+    ];
+
+    sections.forEach(function(s) {
+        var val = _vendorResult[s.key];
+        if (val && val.trim()) {
+            html += '<div style="margin-bottom:12px">' +
+                '<div style="font-size:13px;font-weight:600;color:var(--text-secondary);margin-bottom:4px">' + s.label + '</div>' +
+                '<div style="font-size:13px;line-height:1.5;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;white-space:pre-wrap">' + window.escHtml(val) + '</div>' +
+            '</div>';
+        }
+    });
+
+    if (!html) {
+        html = '<div class="empty-message">AI не извлёк данных о производителях из файла</div>';
+    }
+
+    el.innerHTML = html;
+}
+
+async function loadVendorSection() {
+    try {
+        var resp = await fetch(window.API_BASE + '/projects/' + window.currentProjectId + '/vendor');
+        if (!resp.ok) return;
+        var data = await resp.json();
+        _vendorFiles = data.files || [];
+        _selectedVendorFile = data.selected || (_vendorFiles.length ? _vendorFiles[0].stored_name : '');
+        _vendorResult = data.result || null;
+        _renderVendorFileList();
+        _renderVendorResult();
+        _loadManufacturers(data.manufacturers || {});
+        document.getElementById('vendorFields').style.display = 'block';
+    } catch (e) {
+        // ignore
+    }
+}
+
+window.saveVendorSection = async function() {
+    var mfr = _saveManufacturers();
+    try {
+        var resp = await fetch(window.API_BASE + '/projects/' + window.currentProjectId + '/vendor', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ manufacturers: mfr }),
+        });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        window.showToast('Производители сохранены', 'success');
+    } catch (e) {
+        window.showToast('Ошибка сохранения: ' + e.message, 'error');
     }
 };

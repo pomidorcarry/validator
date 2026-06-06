@@ -74,10 +74,12 @@ namespace LynxRevitPlugin
 
                     try
                     {
-                        Element elem = FindElement(doc, fix.ElementGlobalId, fix.IfcGuidHint);
+                        Element elem = FindElement(doc, fix.ElementGlobalId, fix.IfcGuidHint, fix.ElementIds, fix.RevitElementIds);
                         if (elem == null)
                         {
-                            results.Add($"✗ {fix.ElementName}: элемент не найден");
+                            var revitIdDbg = (fix.RevitElementIds != null && fix.RevitElementIds.Count > 0)
+                                ? $" (Revit ID: {string.Join(",", fix.RevitElementIds)})" : "";
+                            results.Add($"✗ {fix.ElementName}{revitIdDbg}: элемент не найден");
                             failed++;
                             ReportFixResult(settings.ServerUrl, settings.ProjectId, fix.FixId, false, "Element not found");
                             continue;
@@ -136,14 +138,18 @@ namespace LynxRevitPlugin
                             {
                                 tx.Commit();
                                 applied++;
-                                results.Add($"✓ {fix.ElementName}: {fix.Description}");
+                                var revitDbg = (fix.RevitElementIds != null && fix.RevitElementIds.Count > 0)
+                                    ? $" [ID:{string.Join(",", fix.RevitElementIds)}]" : "";
+                                results.Add($"✓ {fix.ElementName}{revitDbg}: {fix.Description}");
                                 ReportFixResult(settings.ServerUrl, settings.ProjectId, fix.FixId, true, null);
                             }
                             else
                             {
                                 tx.RollBack();
                                 failed++;
-                                results.Add($"✗ {fix.ElementName}: ошибка применения шагов");
+                                var revitDbg = (fix.RevitElementIds != null && fix.RevitElementIds.Count > 0)
+                                    ? $" [ID:{string.Join(",", fix.RevitElementIds)}]" : "";
+                                results.Add($"✗ {fix.ElementName}{revitDbg}: ошибка применения шагов");
                                 ReportFixResult(settings.ServerUrl, settings.ProjectId, fix.FixId, false, "Step application failed");
                             }
                         }
@@ -151,7 +157,9 @@ namespace LynxRevitPlugin
                     catch (Exception ex)
                     {
                         failed++;
-                        results.Add($"✗ {fix.ElementName}: {ex.Message}");
+                        var revitDbg = (fix.RevitElementIds != null && fix.RevitElementIds.Count > 0)
+                            ? $" [ID:{string.Join(",", fix.RevitElementIds)}]" : "";
+                        results.Add($"✗ {fix.ElementName}{revitDbg}: {ex.Message}");
                         ReportFixResult(settings.ServerUrl, settings.ProjectId, fix.FixId, false, ex.Message);
                     }
                 }
@@ -174,55 +182,75 @@ namespace LynxRevitPlugin
             }
         }
 
-        private Element FindElement(Document doc, string globalId, string ifcGuidHint)
+        private Element FindElement(Document doc, string globalId, string ifcGuidHint, List<string> elementIds = null, List<int> revitElementIds = null)
         {
-            // Strategy 1: Try to find by IfcGUID parameter
-            if (!string.IsNullOrEmpty(ifcGuidHint))
+            // Strategy 0: Direct Revit ElementId lookup (fastest)
+            if (revitElementIds != null)
+            {
+#pragma warning disable CS0618
+                foreach (int rid in revitElementIds)
+                {
+                    try
+                    {
+                        Element el = doc.GetElement(new ElementId(rid));
+                        if (el != null) return el;
+                    }
+                    catch { }
+                }
+#pragma warning restore CS0618
+            }
+
+            // Collect all string IDs to try
+            var idsToTry = new List<string>();
+            if (!string.IsNullOrEmpty(ifcGuidHint)) idsToTry.Add(ifcGuidHint);
+            if (!string.IsNullOrEmpty(globalId)) idsToTry.Add(globalId);
+            if (elementIds != null) idsToTry.AddRange(elementIds);
+            idsToTry = idsToTry.Distinct().ToList();
+
+            // Strategy 1: Try IfcGUID parameter match for each ID
+            foreach (var id in idsToTry)
             {
                 var collector = new FilteredElementCollector(doc)
                     .WhereElementIsNotElementType();
-
                 var paramProv = new ParameterValueProvider(new ElementId(BuiltInParameter.IFC_GUID));
                 var valRule = new FilterStringEquals();
-                var rule = new FilterStringRule(paramProv, valRule, ifcGuidHint, false);
+                var rule = new FilterStringRule(paramProv, valRule, id);
                 var filter = new ElementParameterFilter(rule);
-
                 var found = collector.WherePasses(filter).FirstElement();
                 if (found != null) return found;
             }
 
-            // Strategy 2: Try by Element.UniqueId
-            if (!string.IsNullOrEmpty(globalId))
+            // Strategy 2: Try by Element.UniqueId for each ID
+            foreach (var id in idsToTry)
             {
                 try
                 {
-                    Element elem = doc.GetElement(globalId);
+                    Element elem = doc.GetElement(id);
                     if (elem != null) return elem;
                 }
                 catch { }
+            }
 
-                // Strategy 3: Try by ADSK_ГлобальныйИдентификатор parameter
-                var collector2 = new FilteredElementCollector(doc)
-                    .WhereElementIsNotElementType();
+            // Strategy 3: Broader search — iterate all elements, match by parameter
+            var allElements = new FilteredElementCollector(doc)
+                .WhereElementIsNotElementType()
+                .ToElements();
 
-                var paramProv2 = new ParameterValueProvider(new ElementId(BuiltInParameter.ALL_MODEL_INSTANCE_COMMENTS));
-                // Try different parameter names for global ID
-                var paramFilter = new ElementCategoryFilter(BuiltInCategory.OST_PipeCurves);
-                // Broader search — iterate through elements
-                var allElements = new FilteredElementCollector(doc)
-                    .WhereElementIsNotElementType()
-                    .ToElements();
-
-                foreach (Element el in allElements)
+            foreach (Element el in allElements)
+            {
+                foreach (Parameter p in el.Parameters)
                 {
-                    foreach (Parameter p in el.Parameters)
+                    string pname = p.Definition?.Name ?? "";
+                    if (pname.Contains("Глобальный") || pname.Contains("Global") || pname == "IfcGUID")
                     {
-                        string pname = p.Definition?.Name ?? "";
-                        if (pname.Contains("Глобальный") || pname.Contains("Global") || pname == "IfcGUID")
+                        string val = p.AsString();
+                        if (!string.IsNullOrEmpty(val))
                         {
-                            string val = p.AsString();
-                            if (!string.IsNullOrEmpty(val) && val.Contains(globalId))
-                                return el;
+                            foreach (var id in idsToTry)
+                            {
+                                if (val.Contains(id))
+                                    return el;
+                            }
                         }
                     }
                 }
@@ -238,7 +266,8 @@ namespace LynxRevitPlugin
                 using (var client = new HttpClient())
                 {
                     client.Timeout = TimeSpan.FromSeconds(30);
-                    var resp = client.GetAsync($"{serverUrl}/api/v1/projects/{projectId}/fix-suggestions?status=approved")
+                    // Fetch sent orders from the changes API
+                    var resp = client.GetAsync($"{serverUrl}/api/v1/projects/{projectId}/changes/for-revit")
                         .GetAwaiter().GetResult();
 
                     if (!resp.IsSuccessStatusCode)
@@ -246,15 +275,57 @@ namespace LynxRevitPlugin
 
                     var json = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult();
                     var data = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object>>(json);
-                    if (data == null) return null;
+                    if (data == null || !data.ContainsKey("orders"))
+                        return null;
 
-                    var fixesJson = Newtonsoft.Json.JsonConvert.SerializeObject(data["fixes"]);
-                    var fixes = Newtonsoft.Json.JsonConvert.DeserializeObject<List<FixInstruction>>(fixesJson);
-                    return fixes;
+                    var ordersJson = Newtonsoft.Json.JsonConvert.SerializeObject(data["orders"]);
+                    var orders = Newtonsoft.Json.JsonConvert.DeserializeObject<List<ChangeOrder>>(ordersJson);
+
+                    var fixes = new List<FixInstruction>();
+                    foreach (var order in orders)
+                    {
+                        if (order.Fixes == null) continue;
+                        foreach (var cf in order.Fixes)
+                        {
+                            if (cf.Status == "rejected") continue;
+                            var eid = cf.ElementGlobalId ?? "";
+                            var eids = cf.ElementIds ?? new List<string>();
+                            if (string.IsNullOrEmpty(eid) && eids.Count > 0)
+                                eid = eids[0];
+                            var revitIds = cf.RevitElementIds ?? new List<int>();
+                            if (revitIds.Count == 0)
+                            {
+                                // Fallback: try to parse from element_ids -> they might be numeric
+                                foreach (var id in eids)
+                                {
+                                    if (int.TryParse(id, out int parsed))
+                                    {
+                                        revitIds.Add(parsed);
+                                    }
+                                }
+                            }
+                            fixes.Add(new FixInstruction
+                            {
+                                FixId = cf.FixId ?? Guid.NewGuid().ToString(),
+                                OrderId = order.Id,
+                                ElementName = cf.ElementName ?? "",
+                                ElementGlobalId = eid,
+                                ElementIds = eids,
+                                RevitElementIds = revitIds,
+                                Description = cf.Message ?? cf.Instruction ?? "Приказ: " + (order.Title ?? ""),
+                                Risk = "medium",
+                                IssueMessage = cf.Message ?? "",
+                                Steps = cf.Steps ?? new List<FixStep>(),
+                            });
+                        }
+                    }
+
+                    return fixes.Count > 0 ? fixes : null;
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine("FetchApprovedFixes error: " + ex.Message);
                 return null;
             }
         }
@@ -272,7 +343,7 @@ namespace LynxRevitPlugin
                         new KeyValuePair<string, string>("error_message", errorMessage ?? ""),
                     });
                     client.PostAsync(
-                        $"{serverUrl}/api/v1/projects/{projectId}/fix-suggestions/{fixId}/result",
+                        $"{serverUrl}/api/v1/projects/{projectId}/changes/{fixId}/mark-applied",
                         content).GetAwaiter().GetResult();
                 }
             }
@@ -283,16 +354,17 @@ namespace LynxRevitPlugin
     public class FixInstruction
     {
         public string FixId { get; set; }
-        public int IssueIndex { get; set; }
-        public string ElementGlobalId { get; set; }
+        public string OrderId { get; set; }
         public string ElementName { get; set; }
+        public string ElementGlobalId { get; set; }
+        public List<string> ElementIds { get; set; }
+        public List<int> RevitElementIds { get; set; }
         public string Description { get; set; }
         public string Risk { get; set; }
-        public string IfcGuidHint { get; set; }
-        public string Status { get; set; }
         public string IssueMessage { get; set; }
+        public string IfcGuidHint { get; set; }
         public List<FixStep> Steps { get; set; }
-        public FixAction UserAction { get; set; } = FixAction.Apply;
+        public FixAction UserAction { get; set; }
     }
 
     public class FixStep

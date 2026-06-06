@@ -56,13 +56,9 @@ async function loadProjectDetail(projectId) {
     try {
         const resp = await fetch(`${window.API_BASE}/projects/${projectId}`);
         const p = await resp.json();
-        const tz = p.technical_specification || '';
-        document.getElementById('tzContent').textContent = tz || 'Техническое задание не задано';
-        document.getElementById('tzContent').classList.toggle('empty', !tz);
         const kw = p.auto_bind_keywords || '';
         document.getElementById('keywordsContent').textContent = kw || 'не заданы';
     } catch (e) {
-        document.getElementById('tzContent').textContent = 'Ошибка загрузки';
     }
 }
 window.loadProjectDetail = loadProjectDetail;
@@ -141,36 +137,6 @@ window.deleteProject = async function(id) {
         window.showToast('Проект удалён', 'success');
         if (window.currentProjectId === id) window.goHome();
         else loadProjects();
-    } catch (e) {
-        window.showToast('Ошибка: ' + e.message, 'error');
-    }
-};
-
-// ── TZ Editing ──────────────────────────────────────────────────
-
-window.showEditTzModal = function() {
-    const tz = document.getElementById('tzContent').textContent;
-    document.getElementById('tzEditor').value = tz === 'Техническое задание не задано' ? '' : tz;
-    window.openModal('tzModal');
-};
-
-window.saveTz = async function() {
-    const tz = document.getElementById('tzEditor').value;
-    try {
-        const form = new URLSearchParams();
-        form.set('technical_specification', tz);
-        const resp = await fetch(`${window.API_BASE}/projects/${window.currentProjectId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: form,
-        });
-        if (!resp.ok) throw new Error('HTTP ' + resp.status);
-        window.closeModal('tzModal');
-        window.showToast('ТЗ сохранено', 'success');
-        loadProjectDetail(window.currentProjectId);
-        if (document.getElementById('tzView').classList.contains('active')) {
-            window.loadTzPage();
-        }
     } catch (e) {
         window.showToast('Ошибка: ' + e.message, 'error');
     }

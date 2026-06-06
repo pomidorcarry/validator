@@ -2,6 +2,7 @@ using Autodesk.Revit.UI;
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
 using System.Threading.Tasks;
@@ -72,18 +73,22 @@ namespace LynxRevitPlugin
                     SourceFileName = doc.PathName ?? ""
                 };
 
+                // Collect IFC GlobalId → Revit ElementId mapping
+                var elementIdMap = CollectElementIdMap(doc);
+
                 _isUploading = true;
 
                 var capturedHandle = formHandle;
                 var capturedIfcPath = ifcPath;
                 var lynxUrl = settings.LynxUrl;
+                var capturedMap = elementIdMap;
 
                 Task.Run(async () =>
                 {
                     try
                     {
                         capturedHandle.SetStatus("Отправка на сервер...");
-                        var result = await UploadIfcToServerAsync(capturedIfcPath, settings, docData, capturedHandle);
+                        var result = await UploadIfcToServerAsync(capturedIfcPath, capturedMap, settings, docData, capturedHandle);
                         if (result.Success)
                         {
                             capturedHandle.SetCompleted(true, "Модель отправлена");
@@ -126,6 +131,31 @@ namespace LynxRevitPlugin
             }
         }
 
+        private Dictionary<string, int> CollectElementIdMap(Document doc)
+        {
+            var map = new Dictionary<string, int>();
+#pragma warning disable CS0618 // ElementId deprecated members
+
+            var collector = new FilteredElementCollector(doc)
+                .WhereElementIsNotElementType();
+
+            foreach (Element el in collector)
+            {
+                try
+                {
+                    Parameter ifcGuidParam = el.get_Parameter(BuiltInParameter.IFC_GUID);
+                    if (ifcGuidParam == null) continue;
+                    string ifcGuid = ifcGuidParam.AsString();
+                    if (string.IsNullOrEmpty(ifcGuid)) continue;
+                    if (map.ContainsKey(ifcGuid)) continue;
+                    map[ifcGuid] = (int)el.Id.Value;
+                }
+                catch { }
+            }
+
+            return map;
+        }
+
         private string GetExportFolder()
         {
             string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
@@ -160,7 +190,7 @@ namespace LynxRevitPlugin
             }
         }
 
-        private async Task<UploadResult> UploadIfcToServerAsync(string ifcPath, SettingsData settings, DocumentData docData, ProgressFormHandle progressHandle)
+        private async Task<UploadResult> UploadIfcToServerAsync(string ifcPath, Dictionary<string, int> elementIdMap, SettingsData settings, DocumentData docData, ProgressFormHandle progressHandle)
         {
             using (var client = new HttpClient())
             {
@@ -175,6 +205,7 @@ namespace LynxRevitPlugin
                     multipart.Add(new StringContent(docData.RevitVersion), "revit_version");
                     multipart.Add(new StringContent("0.1.0"), "plugin_version");
                     multipart.Add(new StringContent(docData.SourceFileName), "source_file_name");
+                    multipart.Add(new StringContent(Newtonsoft.Json.JsonConvert.SerializeObject(elementIdMap)), "element_id_map");
 
                     var fileInfo = new FileInfo(ifcPath);
                     var progressStream = new ProgressFileStream(ifcPath, (sent, total) =>

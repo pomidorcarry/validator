@@ -44,15 +44,28 @@ namespace LynxRevitPlugin
             panel.AddItem(exportIfcButton);
             panel.AddItem(settingsButton);
 
+            // ── Orders panel ──
+            var ordersPanel = app.CreateRibbonPanel(tabName, "Приказы на изменения");
+
+            var ordersButton = new PushButtonData(
+                "Orders",
+                "Приказы",
+                assemblyPath,
+                "LynxRevitPlugin.OrdersCommand")
+            {
+                ToolTip = "Просмотреть приказы на внесение изменений в модель"
+            };
+            ordersPanel.AddItem(ordersButton);
+
             var applyFixesButton = new PushButtonData(
                 "ApplyFixes",
                 "Применить исправления",
                 assemblyPath,
                 "LynxRevitPlugin.ApplyFixesCommand")
             {
-                ToolTip = "Применить AI-исправления к модели"
+                ToolTip = "Применить исправления из утверждённых приказов"
             };
-            panel.AddItem(applyFixesButton);
+            ordersPanel.AddItem(applyFixesButton);
 
             return Result.Succeeded;
         }

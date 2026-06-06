@@ -53,10 +53,6 @@ lynx-revit-plugin/obj/
 
 .vs/
 .idea/
-.opencode/
-opencode.json
-AGENTS.md
-agents.md
 *.suo
 *.user
 *.userosscache

@@ -8,6 +8,7 @@ import './categories.js';
 import './tzView.js';
 import './dataView.js';
 import './aiCheck.js';
+import './changesView.js';
 import './themes.js';
 // Note: viewer.js is NOT imported here — it's imported by models.js where needed
 // The import of each module triggers its code execution including window.* assignments

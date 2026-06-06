@@ -4,10 +4,7 @@ var tzSearchQuery = '';
 
 window.showTzPage = function() {
     if (!window.currentProjectId) return;
-    document.getElementById('homeView').classList.remove('active');
-    document.getElementById('projectView').classList.remove('active');
     document.getElementById('tzView').classList.add('active');
-    document.getElementById('dataView').classList.remove('active');
     document.getElementById('breadcrumb').innerHTML = [
         '<span class="link" onclick="goHome()">Проекты</span>',
         '<span>/</span>',

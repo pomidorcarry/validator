@@ -56,15 +56,6 @@
             <div class="left-sidebar">
                 <div class="sidebar-section">
                     <div class="sidebar-section-header">
-                        Техническое задание
-                        <span style="display:flex;gap:4px">
-                            <button class="btn-icon" onclick="showEditTzModal()" title="Редактировать ТЗ">✎</button>
-                        </span>
-                    </div>
-                    <div class="tz-content" id="tzContent" style="font-size:12px;color:var(--text-secondary)">Нет ТЗ</div>
-                </div>
-                <div class="sidebar-section">
-                    <div class="sidebar-section-header">
                         Навигация
                     </div>
                     <div style="padding:8px 12px;display:flex;flex-direction:column;gap:4px">
@@ -112,8 +103,9 @@
             </div>
         </div>
 
-        <!-- Elements View (Заполнение элементов модели) -->
+        <!-- Elements View (Заполнение элементов модели) - Modal overlay -->
         <div id="tzView">
+            <div class="tz-overlay-bg" onclick="goToProject()"></div>
             <div class="tz-layout">
                 <div class="tz-sidebar">
                     <div class="tz-sidebar-section">
@@ -176,6 +168,9 @@
                             <div><div class="tz-prop-key">Код</div><div class="tz-prop-val" id="dataMetaCode">-</div></div>
                             <div><div class="tz-prop-key">Моделей</div><div class="tz-prop-val" id="dataMetaModels">-</div></div>
                             <div><div class="tz-prop-key">Элементов</div><div class="tz-prop-val" id="dataMetaElements">-</div></div>
+                            <div style="grid-column:1/-1;margin-top:4px">
+                                <button class="btn-sm" onclick="copyProjectId()" style="font-size:11px;width:100%" title="Скопировать Project ID для плагина Revit">📋 Копировать Project ID</button>
+                            </div>
                         </div>
                     </div>
                     <div class="tz-sidebar-section">
@@ -201,11 +196,14 @@
                             <span class="data-tab active" data-tab="categories" onclick="switchDataTab('categories')">📋 Категории</span>
                             <span class="data-tab" data-tab="tz" onclick="switchDataTab('tz')">📄 ТЗ проекта</span>
                             <span class="data-tab" data-tab="ai-check" onclick="switchDataTab('ai-check')">🧠 Проверка с ИИ</span>
+                            <span class="data-tab" data-tab="vendor" onclick="switchDataTab('vendor')">🏭 Производители</span>
+                            <span class="data-tab" data-tab="changes" onclick="switchDataTab('changes')">🔄 Внесение изменений</span>
                         </div>
                         <span style="flex:1"></span>
                         <button class="btn categories-only" onclick="saveCategories()" style="padding:6px 16px;font-size:13px">Сохранить категории</button>
                         <button class="btn tz-only" onclick="saveTzSection()" style="padding:6px 16px;font-size:13px;display:none">💾 Сохранить ТЗ</button>
                         <button class="btn ai-check-only" onclick="runAiCheck()" style="padding:6px 16px;font-size:13px;display:none">🔄 Обновить проверку</button>
+                        <button class="btn changes-only" onclick="refreshChangesPage()" style="padding:6px 16px;font-size:13px;display:none">🔄 Обновить</button>
                     </div>
                     <div id="dataCategoriesTab" class="data-scroll" style="flex:1;overflow-y:auto;padding:16px">
                         <div style="font-size:14px;font-weight:600;margin-bottom:12px">Список категорий</div>
@@ -214,38 +212,118 @@
                         </div>
                     </div>
                     <div id="dataAiCheckTab" class="data-scroll" style="flex:1;overflow-y:auto;padding:16px;display:none">
-                        <div class="ai-check-center" id="aiCheckCenter">
-                            <div style="font-size:48px;opacity:0.3">🧠</div>
-                            <div style="font-size:18px;font-weight:600">Проверка модели с ИИ</div>
-                            <div class="ai-check-status" id="aiCheckStatus">Сравнение элементов BIM-модели с ТЗ и нормами СП</div>
-                            <button class="ai-check-btn" id="aiCheckBtn" onclick="runAiCheck()">🔍 Проверить</button>
-                        </div>
-                        <div id="aiCheckResults" style="display:none">
-                            <div id="aiCheckCounter" style="font-size:14px;font-weight:600;margin-bottom:16px"></div>
-                            <div id="aiCheckProblemList"></div>
-                            
-                            <div id="aiFixSection" style="margin-top:24px;padding-top:24px;border-top:1px solid var(--border);display:none">
-                                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-                                    <div>
-                                        <div style="font-size:14px;font-weight:600">🔧 Предложенные исправления</div>
-                                        <div style="font-size:12px;color:var(--text-secondary);margin-top:4px" id="aiFixStatus">Сгенерируйте исправления для найденных проблем</div>
-                                    </div>
-                                    <div style="display:flex;gap:8px">
-                                        <button class="btn" id="btnGenerateFixes" onclick="generateFixes()">⚡ Сгенерировать исправления</button>
-                                        <button class="btn" id="btnApplyAllFixes" onclick="approveAllFixes()" style="display:none">✅ Утвердить все</button>
-                                    </div>
+                        <div id="aiCheckContent">
+                            <div id="aiCheckCenter" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:16px">
+                                <div style="font-size:48px;line-height:1">🧠</div>
+                                <div style="font-size:18px;font-weight:600">AI-проверка модели</div>
+                                <div id="aiCheckStatus" style="font-size:14px;color:var(--text-secondary);text-align:center;max-width:500px">
+                                    Сравнение элементов BIM-модели с ТЗ и нормами СП
                                 </div>
-                                <div id="aiFixList"></div>
-                                <div id="aiFixInstructions" style="display:none;margin-top:16px">
-                                    <div class="tz-file-block">
-                                        <div style="font-size:13px;font-weight:600;margin-bottom:8px">📋 Инструкция для Revit</div>
-                                        <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px">
-                                            Утверждённые исправления готовы. Откройте Revit и нажмите <strong>"Применить исправления"</strong> 
-                                            на панели Lynx. Или скопируйте код ниже для передачи коллеге:
-                                        </div>
-                                        <textarea id="aiFixCodeOutput" readonly style="width:100%;height:100px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:8px;font-family:monospace;font-size:11px;resize:vertical"></textarea>
-                                        <button class="btn" style="margin-top:8px" onclick="copyFixInstructions()">📋 Копировать</button>
+                                <button id="aiCheckBtn" class="btn" onclick="runAiCheck()" style="padding:12px 32px;font-size:16px">🔍 Проверить</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="dataVendorTab" class="data-scroll" style="flex:1;overflow-y:auto;padding:16px;display:none">
+                        <div class="tz-file-block">
+                            <div style="font-size:13px;font-weight:600;margin-bottom:8px">Ведомость производителей</div>
+                            <div id="vendorFileList" style="margin-bottom:12px;font-size:13px;color:var(--text-secondary)">Файлов нет</div>
+                            <div class="tz-file-actions">
+                                <button class="btn" onclick="document.getElementById('vendorFileInput').click()">📄 Загрузить PDF/Excel</button>
+                                <input type="file" id="vendorFileInput" accept=".pdf,.xlsx,.xls" style="display:none" onchange="uploadVendorFile(this.files[0])" />
+                                <button class="btn" id="btnParseVendor" onclick="parseVendorAi()" disabled>⚡ Проанализировать производителей</button>
+                                <button class="btn btn-outline" id="btnDownloadVendor" onclick="downloadVendorFile()" style="display:none">📥 Скачать</button>
+                            </div>
+                        </div>
+                        <div id="vendorResult" style="margin-top:16px"></div>
+
+                        <!-- Vendor editable fields -->
+                        <div id="vendorFields" style="margin-top:20px;display:none">
+                            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                                <span style="font-size:14px;font-weight:600">Производители</span>
+                                <button class="btn btn-primary" onclick="saveVendorSection()" style="font-size:13px">💾 Сохранить</button>
+                            </div>
+
+                            <details class="vendor-mfr-group" open>
+                                <summary style="cursor:pointer;font-size:13px;font-weight:600;padding:8px 0">🚰 Водоснабжение</summary>
+                                <div class="vendor-mfr-fields" style="margin-top:8px">
+                                    <label class="tz-field-label">Насосы</label>
+                                    <input class="form-input vendor-mfr-input" id="mfr_ws_pumps" placeholder="Wilo, Grundfos..." />
+                                    <label class="tz-field-label">Арматура</label>
+                                    <input class="form-input vendor-mfr-input" id="mfr_ws_valves" placeholder="Danfoss, Valtec, ADL..." />
+                                    <label class="tz-field-label">Труба и фитинги</label>
+                                    <input class="form-input vendor-mfr-input" id="mfr_ws_pipe" placeholder="РосТурПласт, ГОСТ..." />
+                                    <label class="tz-field-label">Теплоизоляция</label>
+                                    <input class="form-input vendor-mfr-input" id="mfr_ws_insulation" placeholder="K-Flex, Armacell..." />
+                                    <label class="tz-field-label">Коллектор</label>
+                                    <input class="form-input vendor-mfr-input" id="mfr_ws_manifold" placeholder="АкваСмарт, Пульсар..." />
+                                    <label class="tz-field-label">Дополнительное оборудование</label>
+                                    <input class="form-input vendor-mfr-input" id="mfr_ws_additional" placeholder="Счётчики, манометры..." />
+                                </div>
+                            </details>
+
+                            <details class="vendor-mfr-group">
+                                <summary style="cursor:pointer;font-size:13px;font-weight:600;padding:8px 0">🧪 Водоотведение</summary>
+                                <div class="vendor-mfr-fields" style="margin-top:8px">
+                                    <label class="tz-field-label">Насосы</label>
+                                    <input class="form-input vendor-mfr-input" id="mfr_sw_pumps" placeholder="Sololift, Grundfos..." />
+                                    <label class="tz-field-label">Арматура</label>
+                                    <input class="form-input vendor-mfr-input" id="mfr_sw_valves" placeholder="Задвижки, клапаны..." />
+                                    <label class="tz-field-label">Труба и фитинги</label>
+                                    <input class="form-input vendor-mfr-input" id="mfr_sw_pipe" placeholder="РосТурПласт, SML, НПВХ..." />
+                                    <label class="tz-field-label">Теплоизоляция</label>
+                                    <input class="form-input vendor-mfr-input" id="mfr_sw_insulation" placeholder="K-Flex, Armacell..." />
+                                    <label class="tz-field-label">Дополнительное оборудование</label>
+                                    <input class="form-input vendor-mfr-input" id="mfr_sw_additional" placeholder="Воронки HUTTERER & LECHNER..." />
+                                </div>
+                            </details>
+
+                            <details class="vendor-mfr-group">
+                                <summary style="cursor:pointer;font-size:13px;font-weight:600;padding:8px 0">🔥 Пожаротушение</summary>
+                                <div class="vendor-mfr-fields" style="margin-top:8px">
+                                    <label class="tz-field-label">Насосы</label>
+                                    <input class="form-input vendor-mfr-input" id="mfr_ff_pumps" placeholder="Wilo, Grundfos..." />
+                                    <label class="tz-field-label">Арматура</label>
+                                    <input class="form-input vendor-mfr-input" id="mfr_ff_valves" placeholder="Задвижки с электроприводом..." />
+                                    <label class="tz-field-label">Труба и фитинги</label>
+                                    <input class="form-input vendor-mfr-input" id="mfr_ff_pipe" placeholder="ГОСТ 3262-75, ГОСТ 10704-91..." />
+                                    <label class="tz-field-label">Теплоизоляция</label>
+                                    <input class="form-input vendor-mfr-input" id="mfr_ff_insulation" placeholder="Не указана..." />
+                                    <label class="tz-field-label">Дополнительное оборудование</label>
+                                    <input class="form-input vendor-mfr-input" id="mfr_ff_additional" placeholder="Шкафы НПО Пульс, оросители СВУ/ДВУ..." />
+                                </div>
+                            </details>
+                        </div>
+                    </div>
+                    <div id="dataChangesTab" class="data-scroll" style="flex:1;overflow-y:auto;padding:16px;display:none">
+                        <div id="changesContent">
+                            <div class="empty-message" style="padding:40px;text-align:center;color:var(--text-secondary)">Загрузка...</div>
+                        </div>
+                    </div>
+                    <div id="aiCheckResults" style="display:none">
+                        <div id="aiCheckCounter" style="font-size:14px;font-weight:600;margin-bottom:16px"></div>
+                        <div id="aiCheckProblemList"></div>
+                        
+                        <div id="aiFixSection" style="margin-top:24px;padding-top:24px;border-top:1px solid var(--border);display:none">
+                            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+                                <div>
+                                    <div style="font-size:14px;font-weight:600">🔧 Предложенные исправления</div>
+                                    <div style="font-size:12px;color:var(--text-secondary);margin-top:4px" id="aiFixStatus">Сгенерируйте исправления для найденных проблем</div>
+                                </div>
+                                <div style="display:flex;gap:8px">
+                                    <button class="btn" id="btnGenerateFixes" onclick="generateFixes()">⚡ Сгенерировать исправления</button>
+                                    <button class="btn" id="btnApplyAllFixes" onclick="approveAllFixes()" style="display:none">✅ Утвердить все</button>
+                                </div>
+                            </div>
+                            <div id="aiFixList"></div>
+                            <div id="aiFixInstructions" style="display:none;margin-top:16px">
+                                <div class="tz-file-block">
+                                    <div style="font-size:13px;font-weight:600;margin-bottom:8px">📋 Инструкция для Revit</div>
+                                    <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px">
+                                        Утверждённые исправления готовы. Откройте Revit и нажмите <strong>"Применить исправления"</strong> 
+                                        на панели Lynx. Или скопируйте код ниже для передачи коллеге:
                                     </div>
+                                    <textarea id="aiFixCodeOutput" readonly style="width:100%;height:100px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:8px;font-family:monospace;font-size:11px;resize:vertical"></textarea>
+                                    <button class="btn" style="margin-top:8px" onclick="copyFixInstructions()">📋 Копировать</button>
                                 </div>
                             </div>
                         </div>
@@ -266,7 +344,7 @@
                         <!-- Details about the object -->
                         <div style="margin-bottom:20px">
                             <div style="font-size:14px;font-weight:600;margin-bottom:12px">Данные об объекте</div>
-                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                            <div style="display:flex;flex-direction:column;gap:12px">
                                 <div>
                                     <label class="tz-field-label">Адрес объекта</label>
                                     <input class="form-input" id="projectAddress" placeholder="г. Москва, ул. Строителей, д. 1" />
@@ -289,16 +367,20 @@
                         <!-- Pipeline systems -->
                         <div style="margin-bottom:20px">
                             <div style="font-size:14px;font-weight:600;margin-bottom:12px">Трубопроводные системы</div>
-                            <div class="pipeline-tabs" style="display:flex;gap:4px;margin-bottom:12px">
-                                <span class="pipeline-tab active" data-sys="water_supply" onclick="switchPipelineTab('water_supply')">🚰 Водоснабжение</span>
+                            <div class="pipeline-tabs" style="display:flex;gap:4px;margin-bottom:12px;flex-wrap:wrap">
+                                <span class="pipeline-tab active" data-sys="all" onclick="switchPipelineTab('all')">📋 Все</span>
+                                <span class="pipeline-tab" data-sys="water_supply" onclick="switchPipelineTab('water_supply')">🚰 Водоснабжение</span>
                                 <span class="pipeline-tab" data-sys="sewerage" onclick="switchPipelineTab('sewerage')">🧪 Водоотведение</span>
                                 <span class="pipeline-tab" data-sys="fire_fighting" onclick="switchPipelineTab('fire_fighting')">🔥 Пожаротушение</span>
                             </div>
-                            <div id="pipelineTableWrap">
-                                <table class="pipeline-table" id="pipelineTable">
-                                    <thead><tr><th>Участок</th><th>Материал</th><th>Диаметр</th><th>Изоляция</th></tr></thead>
-                                    <tbody id="pipelineTbody"></tbody>
-                                </table>
+                            <div id="pipelineSystemsList" style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px"></div>
+                            <div style="display:flex;gap:8px;align-items:center;padding:12px;background:var(--panel);border:1px dashed var(--border);border-radius:8px">
+                                <select id="newSystemCategory" style="padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:13px">
+                                    <option value="water_supply">🚰 Водоснабжение</option>
+                                    <option value="sewerage">🧪 Водоотведение</option>
+                                    <option value="fire_fighting">🔥 Пожаротушение</option>
+                                </select>
+                                <button class="btn btn-primary" onclick="addPipelineSystem()" style="white-space:nowrap">+ Добавить систему</button>
                             </div>
                         </div>
 
@@ -354,26 +436,6 @@
             <div class="modal-footer">
                 <button class="btn btn-outline" onclick="closeModal('projectModal')">Отмена</button>
                 <button class="btn btn-primary" id="projectSaveBtn" onclick="saveProject()">Создать</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal: Edit TZ -->
-    <div class="modal-overlay" id="tzModal">
-        <div class="modal">
-            <div class="modal-header">
-                <h2>Техническое задание</h2>
-                <button class="modal-close" onclick="closeModal('tzModal')">✕</button>
-            </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <label class="form-label">ТЗ проекта</label>
-                    <textarea class="form-textarea" id="tzEditor" placeholder="Опишите требования к BIM-модели..."></textarea>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-outline" onclick="closeModal('tzModal')">Отмена</button>
-                <button class="btn btn-primary" onclick="saveTz()">Сохранить</button>
             </div>
         </div>
     </div>
@@ -480,6 +542,18 @@
             <div class="modal-footer">
                 <button class="btn btn-outline" onclick="closeModal('tzPreviewModal')">Отмена</button>
                 <button class="btn btn-primary" id="tzPreviewApplyBtn" onclick="applyTzPreview()">✅ Применить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Order Detail -->
+    <div class="modal-overlay" id="orderDetailModal">
+        <div class="modal" style="width:90%;max-width:800px">
+            <div class="modal-header">
+                <h2>Детали приказа</h2>
+                <button class="modal-close" onclick="closeModal('orderDetailModal')">✕</button>
+            </div>
+            <div class="modal-body" style="max-height:70vh;overflow-y:auto" id="orderDetailContent">
             </div>
         </div>
     </div>

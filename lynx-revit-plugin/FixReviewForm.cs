@@ -134,9 +134,13 @@ namespace LynxRevitPlugin
                     Font = new Font("Segoe UI", 9),
                 };
 
+                var revitIdStr = (fix.RevitElementIds != null && fix.RevitElementIds.Count > 0)
+                    ? $"Revit ID: {string.Join(", ", fix.RevitElementIds)}"
+                    : fix.ElementGlobalId ?? "";
+
                 var elemLabel = new Label
                 {
-                    Text = $"Элемент: {fix.ElementName ?? fix.ElementGlobalId ?? "(неизвестно)"}",
+                    Text = $"Элемент: {fix.ElementName ?? "(без имени)"} | {revitIdStr}",
                     Left = 32,
                     Top = 50,
                     Width = card.Width - 50,
