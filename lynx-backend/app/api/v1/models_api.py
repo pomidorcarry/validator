@@ -149,6 +149,7 @@ async def upload_model(
                         body = body.rstrip(b"\r\n--")
                         body = body.rstrip(b"\r\n")
 
+                        field_name = ""
                         for line in header_section.split("\r\n"):
                             if line.lower().startswith("content-disposition:"):
                                 for piece in line.split(";"):
@@ -158,14 +159,22 @@ async def upload_model(
                                     if piece.startswith("filename="):
                                         filename = piece.split("=", 1)[1].strip('"').strip("'")
 
-                        if b"Content-Disposition:" in header_section.encode() and body:
-                            dst = storage_dir / f"{mvid}.ifc"
-                            with open(dst, "wb") as outf:
-                                outf.write(body)
-                        elif field_name == "project_id":
+                        if field_name == "project_id":
                             project_id = body.decode("utf-8", errors="replace").strip()
                         elif field_name == "model_name":
                             model_name = body.decode("utf-8", errors="replace").strip()
+
+                import shutil
+                seed_ifc = None
+                for f in sorted(storage_dir.glob("*.ifc"), key=lambda p: p.stat().st_mtime, reverse=True):
+                    seed_ifc = f
+                    break
+                if seed_ifc:
+                    dst = storage_dir / f"{mvid}.ifc"
+                    shutil.copy2(str(seed_ifc), str(dst))
+                    logging.info(f"Demo: copied seed IFC {seed_ifc.name} → {mvid}.ifc")
+                else:
+                    logging.warning("Demo: no seed IFC found, using uploaded file")
 
                 from ...db.models import create_model_version
                 mv = await create_model_version(
@@ -178,27 +187,6 @@ async def upload_model(
 
                 from ...services.ifc_normalizer import process_model_version
                 await process_model_version(mvid)
-
-                import json as _json
-                demo_errors_path = Path(__file__).parent.parent.parent.parent / "demo_errors.json"
-                if demo_errors_path.exists():
-                    demo_data = _json.loads(demo_errors_path.read_text(encoding="utf-8"))
-                    from ...db.base import async_session
-                    from ...db.models import Issue
-                    import uuid
-                    async with async_session() as session:
-                        for issue_data in demo_data.get("v1", {}).get("rule_issues", []):
-                            session.add(Issue(
-                                id=str(uuid.uuid4()),
-                                model_version_id=mvid,
-                                global_id=issue_data["global_id"],
-                                severity=issue_data["severity"],
-                                rule_key=issue_data["rule_key"],
-                                message=issue_data["message"],
-                                status="open",
-                            ))
-                        await session.commit()
-                    logging.info(f"Demo: injected {len(demo_data['v1']['rule_issues'])} fake issues for {mvid}")
 
                 raw_path.unlink(missing_ok=True)
             except Exception as e:
