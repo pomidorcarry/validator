@@ -5,6 +5,19 @@ router = APIRouter(tags=["ai-check"])
 
 @router.post("/projects/{project_id}/ai-check")
 async def run_ai_check(project_id: str):
+    from ...core.config import settings as _settings
+
+    if _settings.demo_mode:
+        import json as _json
+        from pathlib import Path
+        demo_errors_path = Path(__file__).parent.parent.parent.parent / "demo_errors.json"
+        if demo_errors_path.exists():
+            demo_data = _json.loads(demo_errors_path.read_text(encoding="utf-8"))
+            v1_problems = demo_data.get("v1", {}).get("ai_problems", [])
+            from ...db.models import save_ai_check_result
+            await save_ai_check_result(project_id, v1_problems)
+            return {"problems": v1_problems, "count": len(v1_problems), "demo": True}
+
     from ...services.ai.ai_check import run_ai_check as _run_ai_check
     from ...db.models import get_project as _get_project
 

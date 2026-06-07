@@ -180,4 +180,3 @@ class TestCategories:
         names = [c["name"] for c in fetched]
         assert "Custom A" in names
         assert "Custom B" in names
-<｜｜DSML｜｜parameter name="description" string="true">Write test_db.py

@@ -49,6 +49,24 @@ def _save_fixes(project_id: str, fixes: list) -> None:
 @router.post("/projects/{project_id}/fix-suggestions")
 async def generate_fix_suggestions(project_id: str):
     """Generate fix suggestions from AI check results."""
+    from ...core.config import settings as _settings
+
+    if _settings.demo_mode:
+        import json as _json
+        from pathlib import Path
+        demo_errors_path = Path(__file__).parent.parent.parent.parent / "demo_errors.json"
+        if demo_errors_path.exists():
+            demo_data = _json.loads(demo_errors_path.read_text(encoding="utf-8"))
+            fixes = demo_data.get("v1", {}).get("fix_suggestions", [])
+            ai_problems = demo_data.get("v1", {}).get("ai_problems", [])
+            for fix in fixes:
+                issue_idx = fix.get("issue_index")
+                if issue_idx is not None and 0 <= issue_idx < len(ai_problems):
+                    fix["issue_message"] = ai_problems[issue_idx].get("message", "")
+                    fix["issue_severity"] = ai_problems[issue_idx].get("severity", "warning")
+            _save_fixes(project_id, fixes)
+            return {"fixes": fixes, "count": len(fixes), "demo": True}
+
     from ..services.ai.fix_generator import generate_fixes as _generate
 
     project = await db_models.get_project(project_id)

@@ -125,7 +125,88 @@ async def upload_model(
             logging.error(f"Background multipart parse failed for {mvid}: {e}", exc_info=True)
             raise
 
-    background_tasks.add_task(process_raw_upload, model_version_id, raw_path, boundary)
+    if settings.demo_mode:
+        async def process_raw_upload_demo(mvid: str, raw_path: Path, boundary: str):
+            try:
+                project_id = "820377a6-9d06-486a-bf87-0c9fc815ef44"
+                model_name = "RevitUpload"
+                ruleset_id = "default"
+                filename = None
+
+                with open(raw_path, "rb") as f:
+                    raw_data = f.read()
+
+                if boundary:
+                    parts = raw_data.split(f"--{boundary}".encode())
+                    for part in parts:
+                        if b"Content-Disposition:" not in part:
+                            continue
+                        header_end = part.find(b"\r\n\r\n")
+                        if header_end < 0:
+                            continue
+                        header_section = part[:header_end].decode("utf-8", errors="replace")
+                        body = part[header_end + 4:]
+                        body = body.rstrip(b"\r\n--")
+                        body = body.rstrip(b"\r\n")
+
+                        for line in header_section.split("\r\n"):
+                            if line.lower().startswith("content-disposition:"):
+                                for piece in line.split(";"):
+                                    piece = piece.strip()
+                                    if piece.startswith("name="):
+                                        field_name = piece.split("=", 1)[1].strip('"').strip("'")
+                                    if piece.startswith("filename="):
+                                        filename = piece.split("=", 1)[1].strip('"').strip("'")
+
+                        if b"Content-Disposition:" in header_section.encode() and body:
+                            dst = storage_dir / f"{mvid}.ifc"
+                            with open(dst, "wb") as outf:
+                                outf.write(body)
+                        elif field_name == "project_id":
+                            project_id = body.decode("utf-8", errors="replace").strip()
+                        elif field_name == "model_name":
+                            model_name = body.decode("utf-8", errors="replace").strip()
+
+                from ...db.models import create_model_version
+                mv = await create_model_version(
+                    model_version_id=mvid,
+                    project_id=project_id,
+                    model_name=model_name,
+                    ruleset_id=ruleset_id,
+                    filename=filename or "model.ifc",
+                )
+
+                from ...services.ifc_normalizer import process_model_version
+                await process_model_version(mvid)
+
+                import json as _json
+                demo_errors_path = Path(__file__).parent.parent.parent.parent / "demo_errors.json"
+                if demo_errors_path.exists():
+                    demo_data = _json.loads(demo_errors_path.read_text(encoding="utf-8"))
+                    from ...db.base import async_session
+                    from ...db.models import Issue
+                    import uuid
+                    async with async_session() as session:
+                        for issue_data in demo_data.get("v1", {}).get("rule_issues", []):
+                            session.add(Issue(
+                                id=str(uuid.uuid4()),
+                                model_version_id=mvid,
+                                global_id=issue_data["global_id"],
+                                severity=issue_data["severity"],
+                                rule_key=issue_data["rule_key"],
+                                message=issue_data["message"],
+                                status="open",
+                            ))
+                        await session.commit()
+                    logging.info(f"Demo: injected {len(demo_data['v1']['rule_issues'])} fake issues for {mvid}")
+
+                raw_path.unlink(missing_ok=True)
+            except Exception as e:
+                logging.error(f"Demo upload failed for {mvid}: {e}", exc_info=True)
+
+        background_tasks.add_task(process_raw_upload_demo, model_version_id, raw_path, boundary)
+    else:
+        background_tasks.add_task(process_raw_upload, model_version_id, raw_path, boundary)
     logging.info(f"Upload background task queued for {model_version_id}, size={file_size}")
     return {"model_version_id": model_version_id, "status": "queued"}
 

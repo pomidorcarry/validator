@@ -100,16 +100,16 @@ class TestUploadLargeFiles:
     async def test_upload_poorly_formed_extra_newlines(self, client):
         """Upload with extra whitespace/newlines to test parser robustness."""
         b = self.BOUNDARY
-        body = (
-            f"\r\n\r\n--{b}\r\n"
-            f'Content-Disposition: form-data; name="project_id"\r\n\r\n'
-            f"proj-1\r\n"
-            f"--{b}\r\n"
-            f'Content-Disposition: form-data; name="file"; filename="test.ifc"\r\n'
-            b"Content-Type: application/octet-stream\r\n\r\n"
-            b"IFC content here\r\n"
-            f"--{b}--\r\n"
-        ).encode()
+        body = b"".join([
+            f"\r\n\r\n--{b}\r\n".encode(),
+            f'Content-Disposition: form-data; name="project_id"\r\n\r\n'.encode(),
+            b"proj-1\r\n",
+            f"--{b}\r\n".encode(),
+            f'Content-Disposition: form-data; name="file"; filename="test.ifc"\r\n'.encode(),
+            b"Content-Type: application/octet-stream\r\n\r\n",
+            b"IFC content here\r\n",
+            f"--{b}--\r\n".encode(),
+        ])
         status, data = await self._upload_multipart(client, body)
         assert status == 202
 

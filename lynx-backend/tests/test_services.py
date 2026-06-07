@@ -29,18 +29,18 @@ class TestProjectAutoBind:
         )
         other_proj = resp2.json()
 
-        body = (
-            b"--B\r\n"
-            b'Content-Disposition: form-data; name="project_id"\r\n\r\n'
-            f"{other_proj['id']}\r\n".encode()
-            b"--B\r\n"
-            b'Content-Disposition: form-data; name="model_name"\r\n\r\n'
-            b"School Building Model\r\n"
-            b"--B\r\n"
-            b'Content-Disposition: form-data; name="file"; filename="m.ifc"\r\n\r\n'
-            b"IFC\r\n"
-            b"--B--\r\n"
-        )
+        body = b"".join([
+            b"--B\r\n",
+            b'Content-Disposition: form-data; name="project_id"\r\n\r\n',
+            other_proj['id'].encode() + b"\r\n",
+            b"--B\r\n",
+            b'Content-Disposition: form-data; name="model_name"\r\n\r\n',
+            b"School Building Model\r\n",
+            b"--B\r\n",
+            b'Content-Disposition: form-data; name="file"; filename="m.ifc"\r\n\r\n',
+            b"IFC\r\n",
+            b"--B--\r\n",
+        ])
         resp3 = await client.post(
             "/api/v1/models/upload",
             content=body,
@@ -66,18 +66,18 @@ class TestProjectAutoBind:
         )
         proj = resp.json()
 
-        body = (
-            b"--B\r\n"
-            b'Content-Disposition: form-data; name="project_id"\r\n\r\n'
-            f"{proj['id']}\r\n".encode()
-            b"--B\r\n"
-            b'Content-Disposition: form-data; name="model_name"\r\n\r\n'
-            b"Random Building\r\n"
-            b"--B\r\n"
-            b'Content-Disposition: form-data; name="file"; filename="m.ifc"\r\n\r\n'
-            b"IFC\r\n"
-            b"--B--\r\n"
-        )
+        body = b"".join([
+            b"--B\r\n",
+            b'Content-Disposition: form-data; name="project_id"\r\n\r\n',
+            proj['id'].encode() + b"\r\n",
+            b"--B\r\n",
+            b'Content-Disposition: form-data; name="model_name"\r\n\r\n',
+            b"Random Building\r\n",
+            b"--B\r\n",
+            b'Content-Disposition: form-data; name="file"; filename="m.ifc"\r\n\r\n',
+            b"IFC\r\n",
+            b"--B--\r\n",
+        ])
         resp2 = await client.post(
             "/api/v1/models/upload",
             content=body,
