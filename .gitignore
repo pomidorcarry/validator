@@ -60,3 +60,6 @@ lynx-revit-plugin/obj/
 Thumbs.db
 .DS_Store
 
+
+# Virtual environment
+lynx-backend/.venv/
