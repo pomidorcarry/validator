@@ -65,25 +65,35 @@ namespace LynxRevitPlugin
                 // Apply selected fixes
                 int applied = 0;
                 int failed = 0;
-                var results = new List<string>();
+                var reportEntries = new List<FixReportEntry>();
 
                 foreach (var fix in fixes)
                 {
                     if (fix.UserAction == FixAction.Skip)
                         continue;
 
+                    var revitIdStr = (fix.RevitElementIds != null && fix.RevitElementIds.Count > 0)
+                        ? $"Revit ID: {string.Join(", ", fix.RevitElementIds)}" : "";
+
                     try
                     {
                         Element elem = FindElement(doc, fix.ElementGlobalId, fix.IfcGuidHint, fix.ElementIds, fix.RevitElementIds);
                         if (elem == null)
                         {
-                            var revitIdDbg = (fix.RevitElementIds != null && fix.RevitElementIds.Count > 0)
-                                ? $" (Revit ID: {string.Join(",", fix.RevitElementIds)})" : "";
-                            results.Add($"✗ {fix.ElementName}{revitIdDbg}: элемент не найден");
                             failed++;
+                            reportEntries.Add(new FixReportEntry
+                            {
+                                ElementName = fix.ElementName,
+                                Description = fix.Description,
+                                Success = false,
+                                RevitIds = revitIdStr,
+                                ErrorMessage = "Элемент не найден в документе",
+                            });
                             ReportFixResult(settings.ServerUrl, settings.ProjectId, fix.FixId, false, "Element not found");
                             continue;
                         }
+
+                        var stepResults = new List<string>();
 
                         using (Transaction tx = new Transaction(doc, fix.Description))
                         {
@@ -103,11 +113,12 @@ namespace LynxRevitPlugin
                                             param.Set(intVal);
                                         else
                                             param.Set(step.Value);
+                                        stepResults.Add($"Установлен параметр {step.Param} = {step.Value}");
                                     }
                                     else
                                     {
                                         stepOk = false;
-                                        results.Add($"  ⚠ Параметр {step.Param} не найден у элемента");
+                                        stepResults.Add($"Параметр {step.Param} не найден");
                                     }
                                 }
                                 else if (step.Action == "copy_param")
@@ -119,18 +130,22 @@ namespace LynxRevitPlugin
                                         string val = from.AsString();
                                         if (!string.IsNullOrEmpty(val))
                                             to.Set(val);
+                                        stepResults.Add($"Скопирован {step.FromParam} в {step.ToParam}");
                                     }
                                     else
                                     {
                                         stepOk = false;
+                                        stepResults.Add($"Копирование {step.FromParam} -> {step.ToParam} не удалось");
                                     }
                                 }
                                 else if (step.Action == "set_system")
                                 {
-                                    // Set system via parameter
                                     Parameter sysParam = elem.LookupParameter("BRU_Система");
                                     if (sysParam != null)
+                                    {
                                         sysParam.Set(step.SystemName);
+                                        stepResults.Add($"Установлена система: {step.SystemName}");
+                                    }
                                 }
                             }
 
@@ -138,18 +153,29 @@ namespace LynxRevitPlugin
                             {
                                 tx.Commit();
                                 applied++;
-                                var revitDbg = (fix.RevitElementIds != null && fix.RevitElementIds.Count > 0)
-                                    ? $" [ID:{string.Join(",", fix.RevitElementIds)}]" : "";
-                                results.Add($"✓ {fix.ElementName}{revitDbg}: {fix.Description}");
+                                reportEntries.Add(new FixReportEntry
+                                {
+                                    ElementName = fix.ElementName,
+                                    Description = fix.Description,
+                                    Success = true,
+                                    RevitIds = revitIdStr,
+                                    StepResults = stepResults,
+                                });
                                 ReportFixResult(settings.ServerUrl, settings.ProjectId, fix.FixId, true, null);
                             }
                             else
                             {
                                 tx.RollBack();
                                 failed++;
-                                var revitDbg = (fix.RevitElementIds != null && fix.RevitElementIds.Count > 0)
-                                    ? $" [ID:{string.Join(",", fix.RevitElementIds)}]" : "";
-                                results.Add($"✗ {fix.ElementName}{revitDbg}: ошибка применения шагов");
+                                reportEntries.Add(new FixReportEntry
+                                {
+                                    ElementName = fix.ElementName,
+                                    Description = fix.Description,
+                                    Success = false,
+                                    RevitIds = revitIdStr,
+                                    ErrorMessage = "Ошибка применения одного или нескольких шагов",
+                                    StepResults = stepResults,
+                                });
                                 ReportFixResult(settings.ServerUrl, settings.ProjectId, fix.FixId, false, "Step application failed");
                             }
                         }
@@ -157,16 +183,23 @@ namespace LynxRevitPlugin
                     catch (Exception ex)
                     {
                         failed++;
-                        var revitDbg = (fix.RevitElementIds != null && fix.RevitElementIds.Count > 0)
-                            ? $" [ID:{string.Join(",", fix.RevitElementIds)}]" : "";
-                        results.Add($"✗ {fix.ElementName}{revitDbg}: {ex.Message}");
+                        reportEntries.Add(new FixReportEntry
+                        {
+                            ElementName = fix.ElementName,
+                            Description = fix.Description,
+                            Success = false,
+                            RevitIds = revitIdStr,
+                            ErrorMessage = ex.Message,
+                        });
                         ReportFixResult(settings.ServerUrl, settings.ProjectId, fix.FixId, false, ex.Message);
                     }
                 }
 
-                // Show summary
-                var summary = $"Применено: {applied}\nОшибок: {failed}\n\nДетали:\n" + string.Join("\n", results);
-                TaskDialog.Show("Lynx — Результат исправлений", summary);
+                // Show detailed report
+                using (var form = new FixResultForm(applied, failed, reportEntries))
+                {
+                    form.ShowDialog();
+                }
 
                 return Result.Succeeded;
             }

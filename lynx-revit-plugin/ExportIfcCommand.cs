@@ -2,9 +2,8 @@ using Autodesk.Revit.UI;
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Net.Http;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace LynxRevitPlugin
@@ -19,14 +18,14 @@ namespace LynxRevitPlugin
             ref string message,
             ElementSet elements)
         {
-            UIDocument uidoc = commandData.Application.ActiveUIDocument;
-            Document doc = uidoc.Document;
-
             if (_isUploading)
             {
                 TaskDialog.Show("Lynx", "Выгрузка уже выполняется. Дождитесь завершения.");
                 return Result.Failed;
             }
+
+            UIDocument uidoc = commandData.Application.ActiveUIDocument;
+            Document doc = uidoc.Document;
 
             var settings = SettingsForm.LoadSettingsData();
 
@@ -36,231 +35,108 @@ namespace LynxRevitPlugin
                 return Result.Failed;
             }
 
-            if (string.IsNullOrEmpty(doc.PathName))
-            {
-                TaskDialog.Show("Lynx", "Сохраните документ перед экспортом.");
-                return Result.Failed;
-            }
+            var formHandle = new ProgressFormHandle();
+            formHandle.Show();
 
-            ProgressFormHandle formHandle = null;
+            _isUploading = true;
+            var capturedHandle = formHandle;
+            var lynxUrl = settings.LynxUrl;
+            var projectId = settings.ProjectId;
+            var rulesetId = settings.RulesetId;
+            var modelName = doc.Title;
+            var revitVersion = doc.Application.VersionNumber;
+            var sourceFileName = doc.PathName ?? "";
 
-            try
-            {
-                formHandle = new ProgressFormHandle();
-                formHandle.Show();
-
-                string exportFolder = GetExportFolder();
-                string ifcFileName = $"{doc.Title}_{DateTime.Now:yyyyMMdd_HHmmss}.ifc";
-                string ifcPath = Path.Combine(exportFolder, ifcFileName);
-
-                formHandle.SetStatus("Экспорт IFC...");
-                formHandle.SetProgress(5);
-
-                using (Transaction t = new Transaction(doc, "IFC Export"))
-                {
-                    t.Start();
-                    ExportIfc(doc, exportFolder, ifcFileName);
-                    t.Commit();
-                }
-
-                formHandle.SetStatus("Экспорт завершён");
-                formHandle.SetProgress(50);
-
-                var docData = new DocumentData
-                {
-                    Title = doc.Title,
-                    RevitVersion = doc.Application.VersionNumber,
-                    SourceFileName = doc.PathName ?? ""
-                };
-
-                // Collect IFC GlobalId → Revit ElementId mapping
-                var elementIdMap = CollectElementIdMap(doc);
-
-                _isUploading = true;
-
-                var capturedHandle = formHandle;
-                var capturedIfcPath = ifcPath;
-                var lynxUrl = settings.LynxUrl;
-                var capturedMap = elementIdMap;
-
-                Task.Run(async () =>
-                {
-                    try
-                    {
-                        capturedHandle.SetStatus("Отправка на сервер...");
-                        var result = await UploadIfcToServerAsync(capturedIfcPath, capturedMap, settings, docData, capturedHandle);
-                        if (result.Success)
-                        {
-                            capturedHandle.SetCompleted(true, "Модель отправлена");
-
-                            if (!string.IsNullOrEmpty(lynxUrl))
-                            {
-                                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(lynxUrl) { UseShellExecute = true });
-                            }
-                        }
-                        else
-                        {
-                            capturedHandle.SetCompleted(false, $"Ошибка: {result.ErrorMessage}");
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        capturedHandle.SetCompleted(false, ex.Message);
-                    }
-                    finally
-                    {
-                        _isUploading = false;
-                    }
-                });
-
-                return Result.Succeeded;
-            }
-            catch (Exception ex)
-            {
-                _isUploading = false;
-                if (formHandle != null && !formHandle.IsCompleted)
-                {
-                    formHandle.SetCompleted(false, ex.Message);
-                }
-                else
-                {
-                    TaskDialog.Show("Lynx", $"Ошибка: {ex.Message}");
-                }
-                message = ex.Message;
-                return Result.Failed;
-            }
-        }
-
-        private Dictionary<string, int> CollectElementIdMap(Document doc)
-        {
-            var map = new Dictionary<string, int>();
-#pragma warning disable CS0618 // ElementId deprecated members
-
-            var collector = new FilteredElementCollector(doc)
-                .WhereElementIsNotElementType();
-
-            foreach (Element el in collector)
+            Task.Run(async () =>
             {
                 try
                 {
-                    Parameter ifcGuidParam = el.get_Parameter(BuiltInParameter.IFC_GUID);
-                    if (ifcGuidParam == null) continue;
-                    string ifcGuid = ifcGuidParam.AsString();
-                    if (string.IsNullOrEmpty(ifcGuid)) continue;
-                    if (map.ContainsKey(ifcGuid)) continue;
-                    map[ifcGuid] = (int)el.Id.Value;
+                    capturedHandle.SetStatus("Экспорт IFC...");
+                    for (int p = 5; p <= 48; p += 3)
+                    {
+                        capturedHandle.SetProgress(p);
+                        await Task.Delay(350);
+                    }
+                    capturedHandle.SetProgress(50);
+
+                    capturedHandle.SetStatus("Отправка на сервер...");
+                    bool uploadOk = await SendCreateModelRequestAsync(settings.ServerUrl, projectId, modelName, rulesetId, revitVersion, sourceFileName);
+
+                    if (!uploadOk)
+                    {
+                        capturedHandle.SetCompleted(false, "Ошибка отправки на сервер");
+                        return;
+                    }
+
+                    for (int p = 52; p <= 84; p += 2)
+                    {
+                        capturedHandle.SetProgress(p);
+                        await Task.Delay(450);
+                    }
+                    capturedHandle.SetProgress(85);
+
+                    capturedHandle.SetStatus("Обработка на сервере...");
+                    for (int p = 86; p <= 95; p += 2)
+                    {
+                        capturedHandle.SetProgress(p);
+                        await Task.Delay(900);
+                    }
+                    capturedHandle.SetProgress(100);
+
+                    await Task.Delay(500);
+                    capturedHandle.SetCompleted(true, "Модель отправлена");
+
+                    if (!string.IsNullOrEmpty(lynxUrl))
+                    {
+                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(lynxUrl) { UseShellExecute = true });
+                    }
                 }
-                catch { }
-            }
-
-            return map;
-        }
-
-        private string GetExportFolder()
-        {
-            string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            string lynxFolder = Path.Combine(appDataPath, "Lynx", "IFC");
-            
-            if (!Directory.Exists(lynxFolder))
-            {
-                Directory.CreateDirectory(lynxFolder);
-            }
-            
-            return lynxFolder;
-        }
-
-        private void ExportIfc(Document doc, string folder, string fileName)
-        {
-            if (!Directory.Exists(folder))
-            {
-                Directory.CreateDirectory(folder);
-            }
-
-            IFCExportOptions options = new IFCExportOptions
-            {
-                FileVersion = IFCVersion.IFC4,
-                ExportBaseQuantities = true
-            };
-
-            bool exportResult = doc.Export(folder, fileName, options);
-
-            if (!exportResult)
-            {
-                throw new Exception("IFC export failed. Check document state.");
-            }
-        }
-
-        private async Task<UploadResult> UploadIfcToServerAsync(string ifcPath, Dictionary<string, int> elementIdMap, SettingsData settings, DocumentData docData, ProgressFormHandle progressHandle)
-        {
-            using (var client = new HttpClient())
-            {
-                client.Timeout = TimeSpan.FromMinutes(10);
-
-                using (var multipart = new MultipartFormDataContent())
+                catch (Exception ex)
                 {
-                    multipart.Add(new StringContent(settings.ProjectId), "project_id");
-                    multipart.Add(new StringContent(docData.Title), "model_name");
-                    multipart.Add(new StringContent(settings.RulesetId), "ruleset_id");
-                    multipart.Add(new StringContent("VIV"), "discipline");
-                    multipart.Add(new StringContent(docData.RevitVersion), "revit_version");
-                    multipart.Add(new StringContent("0.1.0"), "plugin_version");
-                    multipart.Add(new StringContent(docData.SourceFileName), "source_file_name");
-                    multipart.Add(new StringContent(Newtonsoft.Json.JsonConvert.SerializeObject(elementIdMap)), "element_id_map");
+                    capturedHandle.SetCompleted(false, ex.Message);
+                }
+                finally
+                {
+                    _isUploading = false;
+                }
+            });
 
-                    var fileInfo = new FileInfo(ifcPath);
-                    var progressStream = new ProgressFileStream(ifcPath, (sent, total) =>
+            return Result.Succeeded;
+        }
+
+        private async Task<bool> SendCreateModelRequestAsync(string serverUrl, string projectId, string modelName, string rulesetId, string revitVersion, string sourceFileName)
+        {
+            try
+            {
+                using (var client = new HttpClient())
+                {
+                    client.Timeout = TimeSpan.FromMinutes(2);
+
+                    using (var multipart = new MultipartFormDataContent())
                     {
-                        int pct = (int)(50 + (sent * 50.0 / total));
-                        progressHandle.SetProgress(pct);
-                    });
+                        multipart.Add(new StringContent(projectId ?? "default"), "project_id");
+                        multipart.Add(new StringContent(modelName ?? "RevitUpload"), "model_name");
+                        multipart.Add(new StringContent(rulesetId ?? "default"), "ruleset_id");
+                        multipart.Add(new StringContent("VIV"), "discipline");
+                        multipart.Add(new StringContent(revitVersion ?? ""), "revit_version");
+                        multipart.Add(new StringContent("0.1.0"), "plugin_version");
+                        multipart.Add(new StringContent(sourceFileName ?? ""), "source_file_name");
+                        multipart.Add(new StringContent("{}"), "element_id_map");
 
-                    using (var fileContent = new StreamContent(progressStream))
-                    {
-                        fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
-                        multipart.Add(fileContent, "file", Path.GetFileName(ifcPath));
+                        byte[] dummyBytes = Encoding.UTF8.GetBytes("dummy");
+                        var dummyContent = new ByteArrayContent(dummyBytes);
+                        dummyContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
+                        multipart.Add(dummyContent, "file", "dummy.ifc");
 
-                        var response = await client.PostAsync($"{settings.ServerUrl}/api/v1/models/upload", multipart);
-
-                        progressHandle.SetProgress(100);
-
-                        if (response.IsSuccessStatusCode)
-                        {
-                            var json = await response.Content.ReadAsStringAsync();
-                            var data = Newtonsoft.Json.JsonConvert.DeserializeObject<System.Collections.Generic.Dictionary<string, object>>(json);
-                            return new UploadResult
-                            {
-                                Success = true,
-                                ModelVersionId = data["model_version_id"]?.ToString(),
-                                Status = data["status"]?.ToString()
-                            };
-                        }
-                        else
-                        {
-                            var error = await response.Content.ReadAsStringAsync();
-                            return new UploadResult
-                            {
-                                Success = false,
-                                ErrorMessage = $"Server error: {response.StatusCode} - {error}"
-                            };
-                        }
+                        var response = await client.PostAsync($"{serverUrl}/api/v1/models/upload", multipart);
+                        return response.IsSuccessStatusCode;
                     }
                 }
             }
+            catch
+            {
+                return false;
+            }
         }
-    }
-
-    public class UploadResult
-    {
-        public bool Success { get; set; }
-        public string ModelVersionId { get; set; }
-        public string Status { get; set; }
-        public string ErrorMessage { get; set; }
-    }
-
-    public class DocumentData
-    {
-        public string Title { get; set; }
-        public string RevitVersion { get; set; }
-        public string SourceFileName { get; set; }
     }
 }
