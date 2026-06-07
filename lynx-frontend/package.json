@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 8080",
-    "build": "vite build"
+    "build": "vite build",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "three": "^0.181.2",
@@ -13,6 +15,8 @@
     "web-ifc": "^0.0.74"
   },
   "devDependencies": {
-    "vite": "^5.4.0"
+    "jsdom": "^29.1.1",
+    "vite": "^5.4.0",
+    "vitest": "^4.1.8"
   }
 }

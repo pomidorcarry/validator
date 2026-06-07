@@ -69,3 +69,14 @@ lynx-frontend/        Vanilla JS SPA (ES Modules, no framework)
 - **Context7 MCP** configured in `opencode.json` for library docs (IfcOpenShell, Revit API, FastAPI, etc.).
 - Revit plugin references DLLs from `C:\Program Files\Autodesk\Revit 2025\` — adjust paths for other versions.
 - `.gitignore` excludes: `lynx.db`, `storage/*/*.ifc/xkt/pdf/xlsx`, `.env`, `node_modules/`, `dist/`, `bin/`, `obj/`, `.opencode/`.
+
+## Workflow
+
+- **Revit plugin (C#/.NET)** — edit & build locally in Visual Studio. `lynx-revit-plugin/` is the source.
+  Copy built `.dll` + `.addin` to `%APPDATA%\Autodesk\Revit\Addins\2025\` to test.
+- **Backend (Python)** — deploy changes directly to server at `/opt/lynx/lynx-backend/`.
+  Sync file(s) via SSH, then `systemctl restart lynx-backend`.
+- **Frontend (JS/Vite)** — make changes locally or on server, then `cd /opt/lynx/lynx-frontend && npm run build` on server.
+- **Server details** — Hetzner VPS at `157.22.175.197`, root SSH access, `lynxbim.duckdns.org`.
+  Nginx at `/etc/nginx/sites-available/lynx`, systemd service `lynx-backend.service`.
+- **Git** — remote is `git@github.com:pomidorcarry/validator.git` (SSH). Server has deploy key for push.

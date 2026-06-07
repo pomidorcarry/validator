@@ -298,3 +298,74 @@ npm run dev    # http://localhost:8080
 | lynx-revit-plugin | 0.3.0 | Экспорт + AI-исправления |
 | lynx-backend | 0.3.0 | Проекты, ТЗ, AI check, fix suggestions |
 | lynx-frontend | 0.3.0 | SPA, 11 модулей, AI-проверка |
+
+---
+
+# Часть 5: Тестирование
+
+## Backend (lynx-backend)
+
+Фреймворк: **pytest** + pytest-asyncio (asyncio_mode = auto).  
+Конфигурация: `lynx-backend/pyproject.toml` (раздел `[tool.pytest.ini_options]`).
+
+### Запуск
+
+```bash
+cd lynx-backend
+pytest tests/ -v          # все тесты
+pytest tests/ -v -k rule   # фильтр по имени
+pytest tests/test_api.py -v  # один файл
+```
+
+### Тестовые файлы
+
+| Файл | Тестов | Описание |
+|------|--------|----------|
+| `tests/conftest.py` | — | Фикстуры: временная БД, временное хранилище, AsyncClient, override_settings |
+| `tests/test_upload.py` | 13 | Загрузка IFC: большие файлы (1KB–10MB), пустые, конкурентные, отсутствие boundary, отсутствие заголовков, повреждённые данные, Revit ID map |
+| `tests/test_api.py` | ~30 | Весь API: health, projects CRUD, модели, категории, TZ, AI status, vendor, изменения, CORS |
+| `tests/test_db.py` | ~15 | БД: CRUD проектов, версий моделей, issues, категорий, move_model, auto-bind |
+| `tests/test_rule_engine.py` | 40 | Rule engine: deep_get (5), операторы (20), eval_rule (7), default rules (8) |
+| `tests/test_element_storage.py` | 5 | Сохранение/загрузка/удаление JSON-блобы, большие данные, JSON type roundtrip |
+| `tests/test_services.py` | 5 | Auto-bind keywords, XKT noop, извлечение диаметра, извлечение материала |
+
+### Что тестируется
+
+- **test_upload.py**: корректность потоковой загрузки (stream → raw → multipart-парсинг), обработка ошибок парсинга, Edge Cases (Concurrent 5× requests)
+- **test_api.py**: каждый endpoint возвращает корректный HTTP-статус и структуру JSON, CORS-заголовки
+- **test_db.py**: CRUD-операции, каскадное удаление, перемещение модели между проектами, автоматическая привязка по ключевым словам
+- **test_rule_engine.py**: all 8 operators (exists, not_exists, eq, neq, in, not_in, gt, gte, lt, lte, regex, between), eval_rule pipeline, проверка DEFAULT_RULES (целостность, уникальность, валидность severity/operator, все правила выполнимы для полного элемента)
+- **test_element_storage.py**: JSON-сериализация на диск, большие вложенные объекты
+- **test_services.py**: auto-bind (поиск ключевых слов в названии модели), извлечение диаметра из `raw_psets`
+
+## Frontend (lynx-frontend)
+
+Фреймворк: **Vitest** + jsdom.  
+Конфигурация: `lynx-frontend/vitest.config.js`.
+
+### Запуск
+
+```bash
+cd lynx-frontend
+npm test              # однократный прогон
+npm run test:watch    # watch mode
+```
+
+### Тестовые файлы
+
+| Файл | Тестов | Описание |
+|------|--------|----------|
+| `src/__tests__/setup.js` | — | Загрузка DOM из index.html (body), общие моки |
+| `src/__tests__/utils.test.js` | 13 | escHtml, formatDate, getStatusBadge, openModal/closeModal, showToast |
+| `src/__tests__/api.test.js` | 1 | API_BASE константа |
+| `src/__tests__/themes.test.js` | 5 | toggleTheme (coffee/original), CSS variables, toggleAiPopup, клик вне попапа |
+| `src/__tests__/navigation.test.js` | 10 | showHome, showProject, goHome, onQuickSelectProject, breadcrumb, view переключение |
+| `src/__tests__/categories.test.js` | 21 | buildCategoryIcons, getDefaultCols, extractProp, formatValue, categorizeElement, getColsForCategory |
+
+### Что тестируется
+
+- **utils.js**: HTML-экранирование (null/undefined/объекты/строки), форматирование дат, статус-бейджи, модальные окна (add/remove active class), toast-уведомления (показ + автозакрытие через 3s)
+- **api.js**: константа `/api/v1` доступна через `window.API_BASE`
+- **themes.js**: применение CSS-переменных при загрузке, переключение тем (original → coffee → original), обновление иконки кнопки, открытие/закрытие AI-попапа, клик вне попапа
+- **navigation.js**: активация/деактивация вьюх (homeView, projectView, tzView, dataView), обновление breadcrumb, скрытие/показ quick select + кнопка нового проекта, очистка state в goHome
+- **categories.js**: генерация иконок (циклические цвета, пустой список), дефолтные колонки для известных/неизвестных категорий, extractProp (по одному ключу, fallback, null, non-object, empty string), formatValue (числа 2 знака, запятая как разделитель, не-числа, null/undefined/whitespace), categorizeElement (подстрока, case-insensitive, empty model_group, fallback)
