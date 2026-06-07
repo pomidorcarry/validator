@@ -194,14 +194,68 @@ window.uploadModel = async function() {
     form.set('ruleset_id', rulesetId);
     form.set('file', fileInput.files[0]);
 
+    document.querySelector('#uploadModal .modal-footer').style.display = 'none';
+    document.querySelector('#uploadModal .modal-body .form-group:not(#uploadProgressWrap)').style.display = 'none';
+    document.getElementById('uploadProgressWrap').style.display = '';
+    document.getElementById('uploadProgressLabel').textContent = 'Отправка на сервер...';
+    document.getElementById('uploadProgressFill').style.width = '10%';
+
     try {
         const resp = await fetch(`${window.API_BASE}/models/upload`, { method: 'POST', body: form });
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
-        window.closeModal('uploadModal');
-        window.showToast('Модель загружена, начата обработка', 'success');
-        loadModels(window.currentProjectId);
+        const data = await resp.json();
+        const mvid = data.model_version_id;
+
+        document.getElementById('uploadProgressLabel').textContent = 'Обработка модели...';
+        document.getElementById('uploadProgressFill').style.width = '30%';
+
+        // Animate progress while polling status
+        var progress = 30;
+        var interval = setInterval(function() {
+            progress = Math.min(progress + 5, 95);
+            document.getElementById('uploadProgressFill').style.width = progress + '%';
+        }, 2000);
+
+        // Poll until processed
+        for (var tries = 0; tries < 60; tries++) {
+            await new Promise(function(r) { setTimeout(r, 3000); });
+            try {
+                var sr = await fetch(window.API_BASE + '/models/' + mvid + '/status');
+                var sd = await sr.json();
+                if (sd.status === 'processed') {
+                    clearInterval(interval);
+                    document.getElementById('uploadProgressFill').style.width = '100%';
+                    document.getElementById('uploadProgressLabel').textContent = 'Готово!';
+                    await new Promise(function(r) { setTimeout(r, 800); });
+                    window.closeModal('uploadModal');
+                    window.showToast('Модель обработана', 'success');
+                    loadModels(window.currentProjectId);
+                    return;
+                }
+                if (sd.status === 'failed') {
+                    clearInterval(interval);
+                    throw new Error('Ошибка обработки');
+                }
+            } catch(pollErr) {
+                // Continue polling
+            }
+        }
+        clearInterval(interval);
+        throw new Error('Таймаут обработки');
     } catch (e) {
+        document.getElementById('uploadProgressLabel').textContent = 'Ошибка: ' + e.message;
+        document.getElementById('uploadProgressFill').style.width = '0%';
+        document.getElementById('uploadProgressFill').style.background = 'var(--error)';
         window.showToast('Ошибка: ' + e.message, 'error');
+        setTimeout(function() {
+            window.closeModal('uploadModal');
+        }, 2000);
+    } finally {
+        document.querySelector('#uploadModal .modal-footer').style.display = '';
+        document.querySelector('#uploadModal .modal-body .form-group:not(#uploadProgressWrap)').style.display = '';
+        document.getElementById('uploadProgressWrap').style.display = 'none';
+        document.getElementById('uploadProgressFill').style.width = '0%';
+        document.getElementById('uploadProgressFill').style.background = '';
     }
 };
 

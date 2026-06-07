@@ -19,6 +19,7 @@ function showProject(projectId) {
         <span class="link" onclick="goHome()">Проекты</span>
         <span>/</span>
         <span class="current">${p ? p.name : '...'}</span>
+        <button class="btn-delete-project" onclick="window.deleteProject('${projectId}')" title="Удалить проект">✕</button>
     `;
 
     const qs = document.getElementById('projectQuickSelect');

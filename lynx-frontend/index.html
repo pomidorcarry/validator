@@ -460,6 +460,12 @@
                     <label class="form-label">Ruleset ID</label>
                     <input class="form-input" id="uploadRulesetId" value="default" />
                 </div>
+                <div class="form-group" id="uploadProgressWrap" style="display:none">
+                    <label class="form-label" id="uploadProgressLabel">Загрузка...</label>
+                    <div class="progress-bar-track">
+                        <div class="progress-bar-fill" id="uploadProgressFill" style="width:0%"></div>
+                    </div>
+                </div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-outline" onclick="closeModal('uploadModal')">Отмена</button>

@@ -40,6 +40,7 @@ function renderProjects() {
                 '<span>📦 ' + (p.models_count ?? 0) + ' моделей</span>',
                 '<span>📅 ' + window.formatDate(p.created_at) + '</span>',
             '</div>',
+            '<button class="project-card-delete" onclick="event.stopPropagation();window.deleteProject(\'' + p.id + '\')" title="Удалить проект">✕</button>',
         '</div>'
     ].join(''); }).join('');
 }
