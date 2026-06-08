@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
 using System.Windows.Forms;
 
 namespace LynxRevitPlugin
@@ -89,84 +90,147 @@ namespace LynxRevitPlugin
             _fixPanel.Controls.Clear();
             _checkboxes.Clear();
 
-            foreach (var fix in _fixes)
+            var grouped = _fixes
+                .GroupBy(f => f.OrderId ?? "Без приказа")
+                .ToList();
+
+            foreach (var group in grouped)
             {
-                var card = new Panel
+                var orderHeader = new Label
                 {
+                    Text = $"📋 Приказ: {group.Key}  |  Исправлений: {group.Count()}",
+                    Font = new Font("Segoe UI", 10, FontStyle.Bold),
+                    ForeColor = Color.FromArgb(139, 92, 246),
                     Width = _fixPanel.Width - 30,
-                    Height = 90,
-                    Margin = new Padding(0, 0, 0, 6),
-                    BorderStyle = BorderStyle.FixedSingle,
+                    Height = 28,
+                    Margin = new Padding(0, 8, 0, 4),
                 };
 
-                var cb = new CheckBox
+                _fixPanel.Controls.Add(orderHeader);
+
+                foreach (var fix in group)
                 {
-                    Text = "",
-                    Checked = true,
-                    Left = 8,
-                    Top = 8,
-                    Width = 20,
-                    Height = 20,
-                };
-                _checkboxes[fix.FixId] = cb;
+                    int cardH = 90;
+                    if (fix.Steps != null && fix.Steps.Count > 0) cardH += 18;
 
-                var riskColor = fix.Risk == "low" ? Color.Green :
-                                fix.Risk == "high" ? Color.Red : Color.Orange;
+                    var card = new Panel
+                    {
+                        Width = _fixPanel.Width - 30,
+                        Height = cardH,
+                        Margin = new Padding(0, 0, 0, 6),
+                        BorderStyle = BorderStyle.FixedSingle,
+                    };
 
-                var riskLabel = new Label
-                {
-                    Text = fix.Risk?.ToUpper() ?? "MEDIUM",
-                    Left = 32,
-                    Top = 8,
-                    Width = 60,
-                    Height = 20,
-                    Font = new Font("Segoe UI", 8, FontStyle.Bold),
-                    ForeColor = riskColor,
-                };
+                    var cb = new CheckBox
+                    {
+                        Text = "",
+                        Checked = true,
+                        Left = 8,
+                        Top = 8,
+                        Width = 20,
+                        Height = 20,
+                    };
+                    _checkboxes[fix.FixId] = cb;
 
-                var descLabel = new Label
-                {
-                    Text = fix.Description ?? "",
-                    Left = 32,
-                    Top = 30,
-                    Width = card.Width - 50,
-                    Height = 20,
-                    Font = new Font("Segoe UI", 9),
-                };
+                    int labelTop = 8;
 
-                var revitIdStr = (fix.RevitElementIds != null && fix.RevitElementIds.Count > 0)
-                    ? $"Revit ID: {string.Join(", ", fix.RevitElementIds)}"
-                    : fix.ElementGlobalId ?? "";
+                    var riskColor = fix.Risk == "low" ? Color.Green :
+                                    fix.Risk == "high" ? Color.Red : Color.Orange;
 
-                var elemLabel = new Label
-                {
-                    Text = $"Элемент: {fix.ElementName ?? "(без имени)"} | {revitIdStr}",
-                    Left = 32,
-                    Top = 50,
-                    Width = card.Width - 50,
-                    Height = 16,
-                    Font = new Font("Segoe UI", 8),
-                    ForeColor = Color.Gray,
-                };
+                    var riskLabel = new Label
+                    {
+                        Text = fix.Risk?.ToUpper() ?? "MEDIUM",
+                        Left = 32,
+                        Top = labelTop,
+                        Width = 60,
+                        Height = 20,
+                        Font = new Font("Segoe UI", 8, FontStyle.Bold),
+                        ForeColor = riskColor,
+                    };
+                    card.Controls.Add(riskLabel);
 
-                var stepsLabel = new Label
-                {
-                    Text = fix.Steps != null ? $"Шагов: {fix.Steps.Count}" : "",
-                    Left = 32,
-                    Top = 66,
-                    Width = card.Width - 50,
-                    Height = 16,
-                    Font = new Font("Segoe UI", 8),
-                    ForeColor = Color.Gray,
-                };
+                    var descLabel = new Label
+                    {
+                        Text = fix.Description ?? "",
+                        Left = 96,
+                        Top = labelTop,
+                        Width = card.Width - 110,
+                        Height = 20,
+                        Font = new Font("Segoe UI", 9),
+                    };
+                    card.Controls.Add(descLabel);
+                    labelTop += 22;
 
-                card.Controls.Add(cb);
-                card.Controls.Add(riskLabel);
-                card.Controls.Add(descLabel);
-                card.Controls.Add(elemLabel);
-                card.Controls.Add(stepsLabel);
+                    // Element name
+                    string elemName = fix.ElementName ?? "(без имени)";
+                    var nameLabel = new Label
+                    {
+                        Text = "Элемент: " + elemName,
+                        Left = 32,
+                        Top = labelTop,
+                        Width = card.Width - 50,
+                        Height = 16,
+                        Font = new Font("Segoe UI", 9),
+                        ForeColor = Color.Gray,
+                    };
+                    card.Controls.Add(nameLabel);
+                    labelTop += 18;
 
-                _fixPanel.Controls.Add(card);
+                    // Global IFC ID + Revit ID
+                    string globalId = fix.ElementGlobalId ?? "";
+                    bool hasRevitIds = fix.RevitElementIds != null && fix.RevitElementIds.Count > 0;
+                    string globalText = !string.IsNullOrEmpty(globalId) ? globalId : "(нет)";
+
+                    var globalLabel = new Label
+                    {
+                        Text = "IFC GUID: " + globalText,
+                        Left = 32,
+                        Top = labelTop,
+                        Width = card.Width - 50,
+                        Height = 16,
+                        Font = new Font("Segoe UI", 8, FontStyle.Italic),
+                        ForeColor = Color.FromArgb(100, 100, 130),
+                    };
+                    card.Controls.Add(globalLabel);
+                    labelTop += 16;
+
+                    if (hasRevitIds)
+                    {
+                        var revitLabel = new Label
+                        {
+                            Text = "Revit ID: " + string.Join(", ", fix.RevitElementIds),
+                            Left = 32,
+                            Top = labelTop,
+                            Width = card.Width - 50,
+                            Height = 16,
+                            Font = new Font("Segoe UI", 8, FontStyle.Bold),
+                            ForeColor = Color.FromArgb(52, 211, 153),
+                        };
+                        card.Controls.Add(revitLabel);
+                        labelTop += 18;
+                    }
+
+                    // Steps info
+                    if (fix.Steps != null && fix.Steps.Count > 0)
+                    {
+                        var actions = string.Join(", ", fix.Steps.Select(s => s.Action));
+                        var stepsLabel2 = new Label
+                        {
+                            Text = "Шаги: " + actions,
+                            Left = 32,
+                            Top = labelTop,
+                            Width = card.Width - 50,
+                            Height = 16,
+                            Font = new Font("Segoe UI", 8),
+                            ForeColor = Color.Gray,
+                        };
+                        card.Controls.Add(stepsLabel2);
+                    }
+
+                    card.Controls.Add(cb);
+
+                    _fixPanel.Controls.Add(card);
+                }
             }
         }
 

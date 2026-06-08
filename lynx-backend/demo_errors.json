@@ -5,89 +5,109 @@
         "rule_key": "demo.rule.sprinkler_in_wrong_system",
         "severity": "error",
         "message": "Спринклер (IfcFlowTerminal #5821) подключён к системе В1 (хозяйственно-питьевое водоснабжение). Спринклеры должны быть подключены к системе пожаротушения.",
-        "global_id": "3Dk8m9X2z5A7fQ1rT6vB9cN4"
+        "global_id": "3Dk8m9X2z5A7fQ1rT6vB9cN4",
+        "element_ids": ["3Dk8m9X2z5A7fQ1rT6vB9cN4"]
       },
       {
         "rule_key": "demo.rule.sewer_in_wrong_system",
         "severity": "error",
         "message": "Канализационный элемент (IfcPipeFitting #3417) подключён к системе В1 (хозяйственно-питьевое водоснабжение). Должен быть в системе К1/К2.",
-        "global_id": "7Hj2pL9wR4xZ1mN6kQ3vF8bT1"
+        "global_id": "7Hj2pL9wR4xZ1mN6kQ3vF8bT1",
+        "element_ids": ["7Hj2pL9wR4xZ1mN6kQ3vF8bT1"]
       },
       {
         "rule_key": "demo.rule.material_mismatch",
         "severity": "warning",
         "message": "Труба (IfcPipeSegment #9123) в системе К2 (канализация) имеет материал 'Нержавеющая сталь'. Рекомендуется ПП (полипропилен) или ЧШГ.",
-        "global_id": "1Fg8sA4dG7hJ3kL9pO2iU5yR6"
+        "global_id": "1Fg8sA4dG7hJ3kL9pO2iU5yR6",
+        "element_ids": ["1Fg8sA4dG7hJ3kL9pO2iU5yR6"]
       },
       {
         "rule_key": "demo.rule.negative_slope",
         "severity": "error",
         "message": "Участок канализации (IfcPipeSegment #7732) имеет отрицательный уклон (-0.005). Самотечная канализация должна иметь уклон не менее 0.02 по направлению к стояку.",
-        "global_id": "5Bv2nM8xS1cF4wE7rT0yH3jK9"
+        "global_id": "5Bv2nM8xS1cF4wE7rT0yH3jK9",
+        "element_ids": ["5Bv2nM8xS1cF4wE7rT0yH3jK9"]
       },
       {
         "rule_key": "demo.rule.disconnected_pipe",
         "severity": "error",
         "message": "Труба (IfcPipeSegment #4501) не имеет подключений к другим элементам. Элемент висит в воздухе без логических связей.",
-        "global_id": "9Lp6kD3sG5hJ2mN8vB7cX0zF4"
+        "global_id": "9Lp6kD3sG5hJ2mN8vB7cX0zF4",
+        "element_ids": ["9Lp6kD3sG5hJ2mN8vB7cX0zF4"]
       },
       {
         "rule_key": "demo.rule.network_gap",
         "severity": "warning",
         "message": "Обнаружен разрыв сети: расстояние между сегментами #4501 и #4502 составляет 15 мм. Сегменты одной системы должны быть соединены.",
-        "global_id": "2Rf9aH4tW7yK1pL5mN8bV3cX0"
+        "global_id": "2Rf9aH4tW7yK1pL5mN8bV3cX0",
+        "element_ids": ["4501", "4502"]
       },
       {
         "rule_key": "demo.rule.duplicate_element",
         "severity": "warning",
         "message": "Два элемента (IfcPipeSegment #6641 и #6642) занимают практически идентичное положение в пространстве. Возможно дублирование.",
-        "global_id": "4Tg2hN7sD0fG5jK8lP1oI3uR9"
+        "global_id": "4Tg2hN7sD0fG5jK8lP1oI3uR9",
+        "element_ids": ["6641", "6642"]
       },
       {
         "rule_key": "demo.rule.pump_no_mark",
         "severity": "warning",
         "message": "Насосное оборудование (IfcFlowTerminal #2201) не содержит марки. Заполните параметр 'Марка' или 'Тип'.",
-        "global_id": "6Yk1cF8pR3xV9mB4nL7sH0wD2"
+        "global_id": "6Yk1cF8pR3xV9mB4nL7sH0wD2",
+        "element_ids": ["6Yk1cF8pR3xV9mB4nL7sH0wD2"]
       },
       {
         "rule_key": "demo.rule.system_name_mismatch",
         "severity": "error",
         "message": "Несоответствие имени системы: обнаружены варианты 'В1', 'В 1', 'Водоснабжение_1' в элементах одной сети. Приведите к единому формату.",
-        "global_id": "8Hn3sD6gJ9mK2pL5xV7cF0bR1"
+        "global_id": "8Hn3sD6gJ9mK2pL5xV7cF0bR1",
+        "element_ids": ["8Hn3sD6gJ9mK2pL5xV7cF0bR1"]
       },
       {
         "rule_key": "demo.rule.valve_wrong_type",
         "severity": "warning",
         "message": "Обратный клапан (IfcValve #3015) установлен на самотечной канализации К2. Обратные клапаны применяются только на напорных трубопроводах.",
-        "global_id": "0Fd4lK7tR2xP9mB5nH8sV1cW3"
+        "global_id": "0Fd4lK7tR2xP9mB5nH8sV1cW3",
+        "element_ids": ["0Fd4lK7tR2xP9mB5nH8sV1cW3"]
       }
     ],
     "ai_problems": [
       {
+        "global_id": "1Fg8sA4dG7hJ3kL9pO2iU5yR6",
+        "element_ids": ["1Fg8sA4dG7hJ3kL9pO2iU5yR6"],
         "message": "Толщина изоляции трубопровода К2 не соответствует ТЗ. В ТЗ указано 13 мм, в модели — 20 мм.",
         "severity": "error",
         "category": "tz_comparison",
         "details": "Согласно ТЗ раздел 4.2: 'Для системы К2 принять изоляцию 13 мм'. Фактическое значение в модели: 20 мм."
       },
       {
+        "global_id": "7Hj2pL9wR4xZ1mN6kQ3vF8bT1",
+        "element_ids": ["7Hj2pL9wR4xZ1mN6kQ3vF8bT1"],
         "message": "В насосной станции обнаружен трубопровод из ПП (полипропилена). ТЗ требует нержавеющую сталь.",
         "severity": "error",
         "category": "tz_comparison",
         "details": "ТЗ раздел 5.1: 'Трубопроводы насосной станции выполнить из нержавеющей стали'. Фактический материал: ПП."
       },
       {
+        "global_id": "3Dk8m9X2z5A7fQ1rT6vB9cN4",
+        "element_ids": ["3Dk8m9X2z5A7fQ1rT6vB9cN4"],
         "message": "Магистральный трубопровод В1 имеет диаметр DN80. ТЗ требует DN100.",
         "severity": "error",
         "category": "tz_comparison",
         "details": "ТЗ раздел 3.2: 'Магистральный трубопровод В1 выполнить DN100'. Фактический диаметр: DN80."
       },
       {
+        "global_id": "8Hn3sD6gJ9mK2pL5xV7cF0bR1",
+        "element_ids": ["8Hn3sD6gJ9mK2pL5xV7cF0bR1"],
         "message": "Трубопровод В1 проходит через помещение 'Электрощитовая' (пом. № 105). ТЗ запрещает прокладку трубопроводов водоснабжения в электрощитовых.",
         "severity": "error",
         "category": "spatial_analysis",
         "details": "ТЗ раздел 7.1: 'В помещении электрощитовой запрещается прокладка трубопроводов водоснабжения и канализации'. Обнаружено пересечение трассы В1 с помещением 'Электрощитовая'."
       },
       {
+        "global_id": "0Fd4lK7tR2xP9mB5nH8sV1cW3",
+        "element_ids": ["0Fd4lK7tR2xP9mB5nH8sV1cW3"],
         "message": "Обнаружено применение оцинкованных труб в системе В1. ТЗ запрещает использование оцинкованных труб для хозяйственно-питьевого водоснабжения.",
         "severity": "warning",
         "category": "tz_comparison",
@@ -99,117 +119,66 @@
         "fix_id": "demo-fix-001",
         "issue_index": 0,
         "type": "multi_step",
-        "element_global_id": "3Dk8m9X2z5A7fQ1rT6vB9cN4",
-        "description": "Изменить толщину изоляции К2 с 20 мм на 13 мм согласно ТЗ",
+        "element_name": "Труба К2 (изоляция)",
+        "element_global_id": "1Fg8sA4dG7hJ3kL9pO2iU5yR6",
+        "element_ids": ["1Fg8sA4dG7hJ3kL9pO2iU5yR6"],
+        "revit_element_ids": [],
+        "description": "К2: толщина изоляции 20 → 13 мм",
         "risk": "low",
         "status": "pending",
         "created_at": "2026-06-07T12:00:00Z",
         "steps": [
-          {
-            "action": "copy_param",
-            "from_param": "Pset_Insulation.Thickness (20 мм)",
-            "to_param": "BRU_Изоляция",
-            "description": "Скопировать текущее значение изоляции для анализа"
-          },
-          {
-            "action": "set_param",
-            "param": "BRU_Изоляция",
-            "value": "13",
-            "description": "Установить толщину изоляции 13 мм согласно ТЗ раздел 4.2"
-          },
-          {
-            "action": "set_param",
-            "param": "BRU_Примечание",
-            "value": "Изоляция изменена по ТЗ п.4.2",
-            "description": "Добавить примечание о причине изменения"
-          }
+          { "action": "change_insulation", "value": "13" }
         ]
       },
       {
         "fix_id": "demo-fix-002",
         "issue_index": 1,
         "type": "multi_step",
+        "element_name": "Труба насосной (ПП)",
         "element_global_id": "7Hj2pL9wR4xZ1mN6kQ3vF8bT1",
-        "description": "Заменить материал трубопровода в насосной с ПП на нержавеющую сталь",
+        "element_ids": ["7Hj2pL9wR4xZ1mN6kQ3vF8bT1"],
+        "revit_element_ids": [],
+        "description": "Насосная: ПП → Нержавейка",
         "risk": "high",
         "status": "pending",
         "created_at": "2026-06-07T12:00:00Z",
         "steps": [
-          {
-            "action": "set_param",
-            "param": "BRU_Материал",
-            "value": "Нержавеющая сталь",
-            "description": "Изменить материал труб с ПП на нержавеющую сталь (ТЗ разд.5.1)"
-          },
-          {
-            "action": "set_system",
-            "system_name": "Н1 (насосная станция)",
-            "description": "Проверить принадлежность участка к системе насосной станции Н1"
-          },
-          {
-            "action": "set_param",
-            "param": "BRU_Диаметр",
-            "value": "DN100",
-            "description": "Установить диаметр DN100 для нержавеющего трубопровода насосной"
-          }
+          { "action": "change_type", "value": "Нерж" }
         ]
       },
       {
         "fix_id": "demo-fix-003",
         "issue_index": 2,
         "type": "multi_step",
-        "element_global_id": "1Fg8sA4dG7hJ3kL9pO2iU5yR6",
-        "description": "Изменить диаметр магистрального трубопровода В1 с DN80 на DN100",
+        "element_name": "Магистраль В1 (DN80)",
+        "element_global_id": "3Dk8m9X2z5A7fQ1rT6vB9cN4",
+        "element_ids": ["3Dk8m9X2z5A7fQ1rT6vB9cN4"],
+        "revit_element_ids": [],
+        "description": "В1: DN80 → DN100",
         "risk": "high",
         "status": "pending",
         "created_at": "2026-06-07T12:00:00Z",
         "steps": [
-          {
-            "action": "set_param",
-            "param": "BRU_Диаметр",
-            "value": "DN100",
-            "description": "Увеличить диаметр магистрали В1 с DN80 до DN100 (ТЗ разд.3.2)"
-          },
-          {
-            "action": "copy_param",
-            "from_param": "BRU_Диаметр (DN100)",
-            "to_param": "BRU_Габарит элемента",
-            "description": "Синхронизировать габарит элемента с новым диаметром"
-          },
-          {
-            "action": "set_param",
-            "param": "BRU_Скорость",
-            "value": "1.5 м/с",
-            "description": "Пересчитать скорость потока для нового диаметра (V=1.5 м/с)"
-          }
+          { "action": "change_type", "value": "DN100" }
         ]
       },
       {
         "fix_id": "demo-fix-004",
         "issue_index": 3,
         "type": "multi_step",
-        "element_global_id": "5Bv2nM8xS1cF4wE7rT0yH3jK9",
-        "description": "Перенести трассу В1 в обход помещения 'Электрощитовая' (пом. № 105)",
+        "element_name": "Труба В1 (электрощитовая)",
+        "element_global_id": "8Hn3sD6gJ9mK2pL5xV7cF0bR1",
+        "element_ids": ["8Hn3sD6gJ9mK2pL5xV7cF0bR1"],
+        "revit_element_ids": [],
+        "description": "В1 через Электрощитовую — ручное исправление",
         "risk": "high",
         "status": "pending",
         "created_at": "2026-06-07T12:00:00Z",
         "steps": [
           {
-            "action": "set_system",
-            "system_name": "В1 (обход)",
-            "description": "Определить новый маршрут трассы в обход пом. №105 по коридору"
-          },
-          {
-            "action": "set_param",
-            "param": "BRU_Отметка",
-            "value": "+3.600",
-            "description": "Проложить трассу под перекрытием коридора на отм. +3.600"
-          },
-          {
-            "action": "set_param",
-            "param": "BRU_Изоляция",
-            "value": "20",
-            "description": "Добавить теплоизоляцию 20 мм на участке в неотапливаемом коридоре"
+            "action": "select_and_warn",
+            "param": "ТЗ раздел 7.1: трубопровод В1 пересекает Электрощитовую (пом.105). Перенесите трассу вручную."
           }
         ]
       },
@@ -217,30 +186,16 @@
         "fix_id": "demo-fix-005",
         "issue_index": 4,
         "type": "multi_step",
-        "element_global_id": "9Lp6kD3sG5hJ2mN8vB7cX0zF4",
-        "description": "Заменить оцинкованные трубы в системе В1 на черную сталь",
+        "element_name": "Труба В1 (оцинковка)",
+        "element_global_id": "0Fd4lK7tR2xP9mB5nH8sV1cW3",
+        "element_ids": ["0Fd4lK7tR2xP9mB5nH8sV1cW3"],
+        "revit_element_ids": [],
+        "description": "В1: оцинкованные трубы заменить на черную сталь",
         "risk": "medium",
         "status": "pending",
         "created_at": "2026-06-07T12:00:00Z",
         "steps": [
-          {
-            "action": "set_param",
-            "param": "BRU_Материал",
-            "value": "Черная сталь",
-            "description": "Заменить материал с оцинкованной стали на черную сталь (ТЗ разд.3.4)"
-          },
-          {
-            "action": "set_param",
-            "param": "BRU_Тип_соединения",
-            "value": "Сварное",
-            "description": "Изменить тип соединения на сварное (для черной стали)"
-          },
-          {
-            "action": "set_param",
-            "param": "BRU_Антикоррозия",
-            "value": "Покрытие эмалью ХВ-124",
-            "description": "Добавить антикоррозионное покрытие для черной стали"
-          }
+          { "action": "change_type", "value": "Черная сталь" }
         ]
       }
     ]
@@ -251,41 +206,51 @@
         "rule_key": "demo.rule.sprinkler_in_wrong_system",
         "severity": "error",
         "message": "Спринклер (IfcFlowTerminal #5821) подключён к системе В1 (хозяйственно-питьевое водоснабжение). Спринклеры должны быть подключены к системе пожаротушения.",
-        "global_id": "3Dk8m9X2z5A7fQ1rT6vB9cN4"
+        "global_id": "3Dk8m9X2z5A7fQ1rT6vB9cN4",
+        "element_ids": ["3Dk8m9X2z5A7fQ1rT6vB9cN4"]
       },
       {
         "rule_key": "demo.rule.sewer_in_wrong_system",
         "severity": "error",
         "message": "Канализационный элемент (IfcPipeFitting #3417) подключён к системе В1 (хозяйственно-питьевое водоснабжение). Должен быть в системе К1/К2.",
-        "global_id": "7Hj2pL9wR4xZ1mN6kQ3vF8bT1"
+        "global_id": "7Hj2pL9wR4xZ1mN6kQ3vF8bT1",
+        "element_ids": ["7Hj2pL9wR4xZ1mN6kQ3vF8bT1"]
       },
       {
         "rule_key": "demo.rule.negative_slope",
         "severity": "error",
         "message": "Участок канализации (IfcPipeSegment #7732) имеет отрицательный уклон (-0.005). Самотечная канализация должна иметь уклон не менее 0.02 по направлению к стояку.",
-        "global_id": "5Bv2nM8xS1cF4wE7rT0yH3jK9"
+        "global_id": "5Bv2nM8xS1cF4wE7rT0yH3jK9",
+        "element_ids": ["5Bv2nM8xS1cF4wE7rT0yH3jK9"]
       },
       {
         "rule_key": "demo.rule.system_name_mismatch",
         "severity": "error",
         "message": "Несоответствие имени системы: обнаружены варианты 'В1', 'В 1', 'Водоснабжение_1' в элементах одной сети. Приведите к единому формату.",
-        "global_id": "8Hn3sD6gJ9mK2pL5xV7cF0bR1"
+        "global_id": "8Hn3sD6gJ9mK2pL5xV7cF0bR1",
+        "element_ids": ["8Hn3sD6gJ9mK2pL5xV7cF0bR1"]
       }
     ],
     "ai_problems": [
       {
+        "global_id": "1Fg8sA4dG7hJ3kL9pO2iU5yR6",
+        "element_ids": ["1Fg8sA4dG7hJ3kL9pO2iU5yR6"],
         "message": "Толщина изоляции трубопровода К2 не соответствует ТЗ. В ТЗ указано 13 мм, в модели — 20 мм.",
         "severity": "error",
         "category": "tz_comparison",
         "details": "Согласно ТЗ раздел 4.2: 'Для системы К2 принять изоляцию 13 мм'. Фактическое значение в модели: 20 мм."
       },
       {
+        "global_id": "7Hj2pL9wR4xZ1mN6kQ3vF8bT1",
+        "element_ids": ["7Hj2pL9wR4xZ1mN6kQ3vF8bT1"],
         "message": "В насосной станции обнаружен трубопровод из ПП (полипропилена). ТЗ требует нержавеющую сталь.",
         "severity": "error",
         "category": "tz_comparison",
         "details": "ТЗ раздел 5.1: 'Трубопроводы насосной станции выполнить из нержавеющей стали'. Фактический материал: ПП."
       },
       {
+        "global_id": "8Hn3sD6gJ9mK2pL5xV7cF0bR1",
+        "element_ids": ["8Hn3sD6gJ9mK2pL5xV7cF0bR1"],
         "message": "Трубопровод В1 проходит через помещение 'Электрощитовая' (пом. № 105). ТЗ запрещает прокладку трубопроводов водоснабжения в электрощитовых.",
         "severity": "error",
         "category": "spatial_analysis",
@@ -297,87 +262,50 @@
         "fix_id": "demo-fix-001",
         "issue_index": 0,
         "type": "multi_step",
-        "element_global_id": "3Dk8m9X2z5A7fQ1rT6vB9cN4",
-        "description": "Изменить толщину изоляции К2 с 20 мм на 13 мм согласно ТЗ",
+        "element_name": "Труба К2 (изоляция)",
+        "element_global_id": "1Fg8sA4dG7hJ3kL9pO2iU5yR6",
+        "element_ids": ["1Fg8sA4dG7hJ3kL9pO2iU5yR6"],
+        "revit_element_ids": [],
+        "description": "К2: толщина изоляции 20 → 13 мм",
         "risk": "low",
         "status": "pending",
         "created_at": "2026-06-07T12:00:00Z",
         "steps": [
-          {
-            "action": "copy_param",
-            "from_param": "Pset_Insulation.Thickness (20 мм)",
-            "to_param": "BRU_Изоляция",
-            "description": "Скопировать текущее значение изоляции для анализа"
-          },
-          {
-            "action": "set_param",
-            "param": "BRU_Изоляция",
-            "value": "13",
-            "description": "Установить толщину изоляции 13 мм согласно ТЗ раздел 4.2"
-          },
-          {
-            "action": "set_param",
-            "param": "BRU_Примечание",
-            "value": "Изоляция изменена по ТЗ п.4.2",
-            "description": "Добавить примечание о причине изменения"
-          }
+          { "action": "change_insulation", "value": "13" }
         ]
       },
       {
         "fix_id": "demo-fix-002",
         "issue_index": 1,
         "type": "multi_step",
+        "element_name": "Труба насосной (ПП)",
         "element_global_id": "7Hj2pL9wR4xZ1mN6kQ3vF8bT1",
-        "description": "Заменить материал трубопровода в насосной с ПП на нержавеющую сталь",
+        "element_ids": ["7Hj2pL9wR4xZ1mN6kQ3vF8bT1"],
+        "revit_element_ids": [],
+        "description": "Насосная: ПП → Нержавейка",
         "risk": "high",
         "status": "pending",
         "created_at": "2026-06-07T12:00:00Z",
         "steps": [
-          {
-            "action": "set_param",
-            "param": "BRU_Материал",
-            "value": "Нержавеющая сталь",
-            "description": "Изменить материал труб с ПП на нержавеющую сталь (ТЗ разд.5.1)"
-          },
-          {
-            "action": "set_system",
-            "system_name": "Н1 (насосная станция)",
-            "description": "Проверить принадлежность участка к системе насосной станции Н1"
-          },
-          {
-            "action": "set_param",
-            "param": "BRU_Диаметр",
-            "value": "DN100",
-            "description": "Установить диаметр DN100 для нержавеющего трубопровода насосной"
-          }
+          { "action": "change_type", "value": "Нерж" }
         ]
       },
       {
         "fix_id": "demo-fix-003",
         "issue_index": 2,
         "type": "multi_step",
-        "element_global_id": "5Bv2nM8xS1cF4wE7rT0yH3jK9",
-        "description": "Перенести трассу В1 в обход помещения 'Электрощитовая' (пом. № 105)",
+        "element_name": "Труба В1 (электрощитовая)",
+        "element_global_id": "8Hn3sD6gJ9mK2pL5xV7cF0bR1",
+        "element_ids": ["8Hn3sD6gJ9mK2pL5xV7cF0bR1"],
+        "revit_element_ids": [],
+        "description": "В1 через Электрощитовую — ручное исправление",
         "risk": "high",
         "status": "pending",
         "created_at": "2026-06-07T12:00:00Z",
         "steps": [
           {
-            "action": "set_system",
-            "system_name": "В1 (обход)",
-            "description": "Определить новый маршрут трассы в обход пом. №105 по коридору"
-          },
-          {
-            "action": "set_param",
-            "param": "BRU_Отметка",
-            "value": "+3.600",
-            "description": "Проложить трассу под перекрытием коридора на отм. +3.600"
-          },
-          {
-            "action": "set_param",
-            "param": "BRU_Изоляция",
-            "value": "20",
-            "description": "Добавить теплоизоляцию 20 мм на участке в неотапливаемом коридоре"
+            "action": "select_and_warn",
+            "param": "ТЗ раздел 7.1: трубопровод В1 пересекает Электрощитовую (пом.105). Перенесите трассу вручную."
           }
         ]
       }

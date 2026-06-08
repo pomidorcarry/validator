@@ -13,6 +13,8 @@ namespace LynxRevitPlugin
         public string RevitIds { get; set; }
         public string ErrorMessage { get; set; }
         public List<string> StepResults { get; set; }
+        public List<int> DeletedElementIds { get; set; }
+        public List<int> AddedElementIds { get; set; }
     }
 
     public class FixResultForm : Form
@@ -177,7 +179,10 @@ namespace LynxRevitPlugin
             foreach (var entry in _entries)
             {
                 int stepCount = entry.StepResults?.Count ?? 0;
-                int cardH = 70 + stepCount * 22;
+                int extraCount = 0;
+                if (entry.DeletedElementIds != null && entry.DeletedElementIds.Count > 0) extraCount++;
+                if (entry.AddedElementIds != null && entry.AddedElementIds.Count > 0) extraCount++;
+                int cardH = 70 + (stepCount + extraCount) * 22;
                 var card = new Panel
                 {
                     Width = cardWidth,
@@ -266,12 +271,12 @@ namespace LynxRevitPlugin
                     card.Controls.Add(errorLabel);
                 }
 
+                int stepTop = 62 + (string.IsNullOrEmpty(entry.RevitIds) && entry.Success ? 0 : 16);
+                if (!entry.Success && !string.IsNullOrEmpty(entry.ErrorMessage))
+                    stepTop += 16;
+
                 if (entry.StepResults != null)
                 {
-                    int stepTop = 62 + (string.IsNullOrEmpty(entry.RevitIds) && entry.Success ? 0 : 16);
-                    if (!entry.Success && !string.IsNullOrEmpty(entry.ErrorMessage))
-                        stepTop += 16;
-
                     foreach (var step in entry.StepResults)
                     {
                         var stepLabel = new Label
@@ -288,6 +293,40 @@ namespace LynxRevitPlugin
                         card.Controls.Add(stepLabel);
                         stepTop += 20;
                     }
+                }
+
+                if (entry.DeletedElementIds != null && entry.DeletedElementIds.Count > 0)
+                {
+                    var delLabel = new Label
+                    {
+                        Text = "  \u2716 Удалены ID: " + string.Join(", ", entry.DeletedElementIds),
+                        Font = new Font("Segoe UI", 8),
+                        ForeColor = RedError,
+                        Left = 40,
+                        Top = stepTop,
+                        Width = cardWidth - 60,
+                        Height = 18,
+                        BackColor = Color.Transparent,
+                    };
+                    card.Controls.Add(delLabel);
+                    stepTop += 20;
+                }
+
+                if (entry.AddedElementIds != null && entry.AddedElementIds.Count > 0)
+                {
+                    var addLabel = new Label
+                    {
+                        Text = "  \u2714 Добавлены ID: " + string.Join(", ", entry.AddedElementIds),
+                        Font = new Font("Segoe UI", 8),
+                        ForeColor = GreenOk,
+                        Left = 40,
+                        Top = stepTop,
+                        Width = cardWidth - 60,
+                        Height = 18,
+                        BackColor = Color.Transparent,
+                    };
+                    card.Controls.Add(addLabel);
+                    stepTop += 20;
                 }
 
                 _resultsPanel.Controls.Add(card);
