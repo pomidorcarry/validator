@@ -220,15 +220,52 @@ window.refreshChangesPage = function() {
     loadChangesPage();
 };
 
+// ── Helpers ──
+
+function getDraftOrder() {
+    for (var i = 0; i < _changeOrders.length; i++) {
+        if (_changeOrders[i].status === 'draft') return _changeOrders[i];
+    }
+    return null;
+}
+
+function isFixInOrder(order, fix) {
+    return (order.fixes || []).some(function(f) {
+        return f.source === fix.source && f.source_index === fix.source_index;
+    });
+}
+
+async function appendFixesToOrder(order, fixes, successMsg) {
+    try {
+        var resp = await fetch(window.API_BASE + '/projects/' + window.currentProjectId + '/changes/' + order.id, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ append_fixes: fixes }),
+        });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        var updated = await resp.json();
+        // Update local order copy
+        order.fixes = updated.fixes;
+        renderChangesPage();
+        window.showToast(successMsg || 'Замечания добавлены в приказ', 'success');
+    } catch(e) {
+        window.showToast('Ошибка: ' + e.message, 'error');
+    }
+}
+
 // ── Actions ──
 
 window.addFixToNewOrder = function(index) {
     var fix = _availableFixes[index];
     if (!fix) return;
-    var now = new Date().toISOString();
-    var order = {
-        title: 'Приказ #' + (_changeOrders.length + 1),
-        fixes: [{
+    var draft = getDraftOrder();
+    if (draft) {
+        if (isFixInOrder(draft, fix)) {
+            window.showToast('Это замечание уже добавлено в приказ «' + draft.title + '»', 'info');
+            return;
+        }
+        var now = new Date().toISOString();
+        var newFix = {
             id: Math.random().toString(36).slice(2, 14),
             source: fix.source,
             source_index: fix.source_index,
@@ -241,9 +278,29 @@ window.addFixToNewOrder = function(index) {
             status: 'pending',
             actions: [],
             created_at: now,
-        }]
-    };
-    createOrderAndRefresh(order);
+        };
+        appendFixesToOrder(draft, [newFix], 'Замечание добавлено в приказ «' + draft.title + '»');
+    } else {
+        var now = new Date().toISOString();
+        var order = {
+            title: 'Приказ #' + (_changeOrders.length + 1),
+            fixes: [{
+                id: Math.random().toString(36).slice(2, 14),
+                source: fix.source,
+                source_index: fix.source_index,
+                element_name: fix.element_name,
+                element_ids: fix.element_ids || [],
+                message: fix.message,
+                details: fix.details,
+                severity: fix.severity,
+                rule_key: fix.rule_key,
+                status: 'pending',
+                actions: [],
+                created_at: now,
+            }]
+        };
+        createOrderAndRefresh(order);
+    }
 };
 
 window.showAddAllToOrderModal = function() {
@@ -251,27 +308,62 @@ window.showAddAllToOrderModal = function() {
         window.showToast('Нет доступных замечаний', 'error');
         return;
     }
-    var title = prompt('Название приказа:', 'Приказ #' + (_changeOrders.length + 1) + ' (все замечания)');
-    if (!title) return;
-    var now = new Date().toISOString();
-    var order = {
-        title: title,
-        fixes: _availableFixes.map(function(fix) { return {
-            id: Math.random().toString(36).slice(2, 14),
-            source: fix.source,
-            source_index: fix.source_index,
-            element_name: fix.element_name,
-            element_ids: fix.element_ids || [],
-            message: fix.message,
-            details: fix.details,
-            severity: fix.severity,
-            rule_key: fix.rule_key,
-            status: 'pending',
-            actions: [],
-            created_at: now,
-        };})
-    };
-    createOrderAndRefresh(order);
+    var draft = getDraftOrder();
+    if (draft) {
+        var now = new Date().toISOString();
+        var toAdd = [];
+        var skipped = 0;
+        _availableFixes.forEach(function(fix) {
+            if (isFixInOrder(draft, fix)) {
+                skipped++;
+            } else {
+                toAdd.push({
+                    id: Math.random().toString(36).slice(2, 14),
+                    source: fix.source,
+                    source_index: fix.source_index,
+                    element_name: fix.element_name,
+                    element_ids: fix.element_ids || [],
+                    message: fix.message,
+                    details: fix.details,
+                    severity: fix.severity,
+                    rule_key: fix.rule_key,
+                    status: 'pending',
+                    actions: [],
+                    created_at: now,
+                });
+            }
+        });
+        if (toAdd.length === 0) {
+            window.showToast('Все замечания уже добавлены в приказ «' + draft.title + '»' + (skipped > 0 ? ' (' + skipped + ')' : ''), 'info');
+            return;
+        }
+        var msg = 'Добавить ' + toAdd.length + ' замечаний в приказ «' + draft.title + '»?';
+        if (skipped > 0) msg += ' (' + skipped + ' уже есть)';
+        if (!confirm(msg)) return;
+        appendFixesToOrder(draft, toAdd, 'Добавлено ' + toAdd.length + ' замечаний в приказ «' + draft.title + '»');
+    } else {
+        var title = prompt('Название приказа:', 'Приказ #' + (_changeOrders.length + 1) + ' (все замечания)');
+        if (!title) return;
+        var now = new Date().toISOString();
+        var order = {
+            title: title,
+            fixes: _availableFixes.map(function(fix) { return {
+                id: Math.random().toString(36).slice(2, 14),
+                source: fix.source,
+                source_index: fix.source_index,
+                element_name: fix.element_name,
+                element_ids: fix.element_ids || [],
+                message: fix.message,
+                details: fix.details,
+                severity: fix.severity,
+                rule_key: fix.rule_key,
+                status: 'pending',
+                actions: [],
+                created_at: now,
+            };})
+        };
+        createOrderAndRefresh(order);
+    }
 };
 
 window.showCreateOrderModal = function() {

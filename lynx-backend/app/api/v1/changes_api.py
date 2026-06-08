@@ -109,13 +109,24 @@ async def update_change_order(project_id: str, order_id: str, data: dict = Body(
                 order["status"] = data["status"]
             if "fixes" in data:
                 for incoming in data["fixes"]:
+                    matched = False
                     for existing in order["fixes"]:
                         if existing["id"] == incoming.get("id"):
                             if "status" in incoming:
                                 existing["status"] = incoming["status"]
                             if "actions" in incoming:
                                 existing["actions"] = incoming["actions"]
+                            matched = True
                             break
+                    if not matched:
+                        incoming["id"] = incoming.get("id") or uuid.uuid4().hex[:12]
+                        incoming["status"] = incoming.get("status", "pending")
+                        order["fixes"].append(incoming)
+            if "append_fixes" in data:
+                for fix in data["append_fixes"]:
+                    fix["id"] = fix.get("id") or uuid.uuid4().hex[:12]
+                    fix["status"] = fix.get("status", "pending")
+                    order["fixes"].append(fix)
             _save(project_id, store)
             return order
     raise HTTPException(status_code=404, detail="Order not found")
