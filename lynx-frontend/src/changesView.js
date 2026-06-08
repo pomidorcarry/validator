@@ -56,10 +56,11 @@ async function loadAvailableFixes() {
             if (resp.ok) {
                 var data = await resp.json();
                 if (data.issues) {
-                    data.issues.forEach(function(issue) {
+                    data.issues.forEach(function(issue, i) {
                         if (issue.status === 'resolved' || issue.status === 'dismissed') return;
                         _availableFixes.push({
                             source: 'rule_based',
+                            source_index: i,
                             element_name: issue.element_name || '',
                             element_ids: issue.global_id ? [issue.global_id] : [],
                             message: issue.message || '',
@@ -131,6 +132,7 @@ function renderChangesPage() {
             aiFixes.forEach(function(fix, i) {
                 var sevIcon = fix.severity === 'error' ? '🔴' : '🟡';
                 var sevClass = fix.severity === 'error' ? 'error' : 'warning';
+                var eidStr = (fix.element_ids || []).length ? 'IDs: ' + (fix.element_ids || []).slice(0, 3).join(', ') + ((fix.element_ids || []).length > 3 ? '…' : '') : '';
                 html +=
                     '<div class="changes-fix-card">' +
                         '<div class="changes-fix-severity ' + sevClass + '">' + sevIcon + '</div>' +
@@ -138,6 +140,7 @@ function renderChangesPage() {
                             '<div class="changes-fix-msg">' + window.escHtml(fix.message) + '</div>' +
                             '<div class="changes-fix-meta">' +
                                 (fix.element_name ? '<span class="changes-fix-element">' + window.escHtml(fix.element_name) + '</span>' : '') +
+                                (eidStr ? '<span class="changes-fix-element" style="font-size:10px;color:var(--text-secondary)">' + window.escHtml(eidStr) + '</span>' : '') +
                                 (fix.rule_key ? '<span class="changes-fix-rule">' + window.escHtml(fix.rule_key) + '</span>' : '') +
                             '</div>' +
                         '</div>' +
@@ -156,6 +159,7 @@ function renderChangesPage() {
                 var sevIcon = fix.severity === 'error' ? '🔴' : '🟡';
                 var sevClass = fix.severity === 'error' ? 'error' : 'warning';
                 var flatIndex = aiFixes.length + i;
+                var eidStr = (fix.element_ids || []).length ? 'IDs: ' + (fix.element_ids || []).slice(0, 3).join(', ') + ((fix.element_ids || []).length > 3 ? '…' : '') : '';
                 html +=
                     '<div class="changes-fix-card">' +
                         '<div class="changes-fix-severity ' + sevClass + '">' + sevIcon + '</div>' +
@@ -163,6 +167,7 @@ function renderChangesPage() {
                             '<div class="changes-fix-msg">' + window.escHtml(fix.message) + '</div>' +
                             '<div class="changes-fix-meta">' +
                                 (fix.element_name ? '<span class="changes-fix-element">' + window.escHtml(fix.element_name) + '</span>' : '') +
+                                (eidStr ? '<span class="changes-fix-element" style="font-size:10px;color:var(--text-secondary)">' + window.escHtml(eidStr) + '</span>' : '') +
                                 (fix.rule_key ? '<span class="changes-fix-rule">' + window.escHtml(fix.rule_key) + '</span>' : '') +
                             '</div>' +
                         '</div>' +
