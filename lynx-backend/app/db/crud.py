@@ -76,9 +76,10 @@ async def get_issues(model_version_id: str) -> list:
             select(Issue).where(Issue.model_version_id == model_version_id)
         )
         issues = result.scalars().all()
-        # Load element names in batch
+        # Load element names and cube_ids in batch
         element_ids = [i.element_id for i in issues if i.element_id]
         elements = {}
+        cube_map = {}
         if element_ids:
             from sqlalchemy import select as _select
             elem_result = await session.execute(
@@ -86,6 +87,15 @@ async def get_issues(model_version_id: str) -> list:
             )
             for e in elem_result.scalars().all():
                 elements[e.id] = e.name or ""
+            # Load CUBE_ID from element storage files
+            from .element_storage import load_raw as _load_raw
+            for eid in element_ids:
+                raw = _load_raw(eid)
+                if raw and isinstance(raw, dict):
+                    tekst = raw.get("Текст") or {}
+                    cube_id = tekst.get("CUBE_ID")
+                    if cube_id is not None:
+                        cube_map[eid] = int(cube_id)
         return [
             {
                 "id": i.id,
@@ -95,6 +105,7 @@ async def get_issues(model_version_id: str) -> list:
                 "message": i.message,
                 "status": i.status,
                 "element_name": elements.get(i.element_id, ""),
+                "cube_ids": [cube_map[i.element_id]] if i.element_id in cube_map else [],
             }
             for i in issues
         ]
