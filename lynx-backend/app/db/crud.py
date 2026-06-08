@@ -71,10 +71,21 @@ async def get_model_version(model_version_id: str) -> Optional[dict]:
 
 async def get_issues(model_version_id: str) -> list:
     async with _base.async_session() as session:
+        from sqlalchemy.orm import selectinload
         result = await session.execute(
             select(Issue).where(Issue.model_version_id == model_version_id)
         )
         issues = result.scalars().all()
+        # Load element names in batch
+        element_ids = [i.element_id for i in issues if i.element_id]
+        elements = {}
+        if element_ids:
+            from sqlalchemy import select as _select
+            elem_result = await session.execute(
+                _select(Element).where(Element.id.in_(element_ids))
+            )
+            for e in elem_result.scalars().all():
+                elements[e.id] = e.name or ""
         return [
             {
                 "id": i.id,
@@ -83,6 +94,7 @@ async def get_issues(model_version_id: str) -> list:
                 "rule_key": i.rule_key,
                 "message": i.message,
                 "status": i.status,
+                "element_name": elements.get(i.element_id, ""),
             }
             for i in issues
         ]

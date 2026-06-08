@@ -60,6 +60,19 @@ async def run_ai_check(project_id: str):
 
 @router.get("/projects/{project_id}/ai-check")
 async def get_ai_check(project_id: str):
+    from ...core.config import settings as _settings
+
+    # In demo mode, always serve fresh data from demo_errors.json
+    if _settings.demo_mode:
+        import json as _json
+        from pathlib import Path
+        demo_path = Path(__file__).parent.parent.parent.parent / "demo_errors.json"
+        if demo_path.exists():
+            demo_data = _json.loads(demo_path.read_text(encoding="utf-8"))
+            problems = demo_data.get("v1", {}).get("ai_problems", [])
+            return {"problems": problems, "count": len(problems), "demo": True}
+        return {"problems": [], "count": 0, "demo": True}
+
     from ...db.models import get_ai_check_result as _get_result
     result = await _get_result(project_id)
     if result is None:
