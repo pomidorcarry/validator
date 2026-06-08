@@ -9,7 +9,7 @@ namespace LynxRevitPlugin
     {
         public Result OnStartup(UIControlledApplication app)
         {
-            string tabName = "Lynx";
+            string tabName = "LYNX AI";
 
             try
             {
@@ -19,9 +19,10 @@ namespace LynxRevitPlugin
             {
             }
 
-            var panel = app.CreateRibbonPanel(tabName, "BIM Проверка");
-
             var assemblyPath = Assembly.GetExecutingAssembly().Location;
+
+            // ── Panel 1: BIM Проверка ──
+            var validationPanel = app.CreateRibbonPanel(tabName, "BIM Проверка");
 
             var exportIfcButton = new PushButtonData(
                 "ExportIFC",
@@ -31,6 +32,7 @@ namespace LynxRevitPlugin
             {
                 ToolTip = "Экспортировать модель IFC и отправить на сервер Lynx"
             };
+            validationPanel.AddItem(exportIfcButton);
 
             var settingsButton = new PushButtonData(
                 "Settings",
@@ -40,11 +42,19 @@ namespace LynxRevitPlugin
             {
                 ToolTip = "Настроить подключение к серверу Lynx"
             };
+            validationPanel.AddItem(settingsButton);
 
-            panel.AddItem(exportIfcButton);
-            panel.AddItem(settingsButton);
+            var chatButton = new PushButtonData(
+                "Chat",
+                "AI Ассистент",
+                assemblyPath,
+                "LynxRevitPlugin.ShowChatCommand")
+            {
+                ToolTip = "Открыть AI-чат"
+            };
+            validationPanel.AddItem(chatButton);
 
-            // ── Orders panel ──
+            // ── Panel 2: Приказы на изменения ──
             var ordersPanel = app.CreateRibbonPanel(tabName, "Приказы на изменения");
 
             var ordersButton = new PushButtonData(
