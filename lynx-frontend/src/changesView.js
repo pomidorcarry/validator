@@ -39,6 +39,9 @@ async function loadAvailableFixes() {
                         source_index: i,
                         element_name: p.element_name || '',
                         element_ids: eids,
+                        cube_id: p.cube_id || '',
+                        revit_element_ids: p.revit_element_ids || (p.revit_element_id ? [p.revit_element_id] : []),
+                        global_id: p.global_id || '',
                         message: p.message || '',
                         details: p.details || '',
                         severity: p.severity || 'warning',
@@ -63,6 +66,9 @@ async function loadAvailableFixes() {
                             source_index: i,
                             element_name: issue.element_name || '',
                             element_ids: issue.global_id ? [issue.global_id] : [],
+                            cube_id: issue.cube_id || '',
+                            revit_element_ids: issue.revit_element_ids || (issue.revit_element_id ? [issue.revit_element_id] : []),
+                            global_id: issue.global_id || '',
                             message: issue.message || '',
                             details: issue.details || '',
                             severity: issue.severity || 'error',
@@ -132,7 +138,9 @@ function renderChangesPage() {
             aiFixes.forEach(function(fix, i) {
                 var sevIcon = fix.severity === 'error' ? '🔴' : '🟡';
                 var sevClass = fix.severity === 'error' ? 'error' : 'warning';
-                var eidStr = (fix.element_ids || []).length ? 'IDs: ' + (fix.element_ids || []).slice(0, 3).join(', ') + ((fix.element_ids || []).length > 3 ? '…' : '') : '';
+                var cubeStr = fix.cube_id ? fix.cube_id : '';
+                var revitStr = (fix.revit_element_ids || []).length ? fix.revit_element_ids.join(', ') : '';
+                var ifcStr = (fix.element_ids || []).length ? fix.element_ids.join(', ') : fix.global_id || '';
                 html +=
                     '<div class="changes-fix-card">' +
                         '<div class="changes-fix-severity ' + sevClass + '">' + sevIcon + '</div>' +
@@ -140,7 +148,9 @@ function renderChangesPage() {
                             '<div class="changes-fix-msg">' + window.escHtml(fix.message) + '</div>' +
                             '<div class="changes-fix-meta">' +
                                 (fix.element_name ? '<span class="changes-fix-element">' + window.escHtml(fix.element_name) + '</span>' : '') +
-                                (eidStr ? '<span class="changes-fix-element" style="font-size:10px;color:var(--text-secondary)">' + window.escHtml(eidStr) + '</span>' : '') +
+                                (cubeStr ? '<span class="changes-fix-id" style="font-size:11px;color:#f59e0b">🧊 CUBE: ' + window.escHtml(cubeStr) + '</span>' : '') +
+                                (revitStr ? '<span class="changes-fix-id" style="font-size:11px;color:#52d399">⚙ Revit: ' + window.escHtml(revitStr) + '</span>' : '') +
+                                (ifcStr ? '<span class="changes-fix-id" style="font-size:10px;color:var(--text-secondary)">🏷 IFC: ' + window.escHtml(ifcStr) + '</span>' : '') +
                                 (fix.rule_key ? '<span class="changes-fix-rule">' + window.escHtml(fix.rule_key) + '</span>' : '') +
                             '</div>' +
                         '</div>' +
@@ -159,7 +169,9 @@ function renderChangesPage() {
                 var sevIcon = fix.severity === 'error' ? '🔴' : '🟡';
                 var sevClass = fix.severity === 'error' ? 'error' : 'warning';
                 var flatIndex = aiFixes.length + i;
-                var eidStr = (fix.element_ids || []).length ? 'IDs: ' + (fix.element_ids || []).slice(0, 3).join(', ') + ((fix.element_ids || []).length > 3 ? '…' : '') : '';
+                var cubeStr = fix.cube_id ? fix.cube_id : '';
+                var revitStr = (fix.revit_element_ids || []).length ? fix.revit_element_ids.join(', ') : '';
+                var ifcStr = (fix.element_ids || []).length ? fix.element_ids.join(', ') : fix.global_id || '';
                 html +=
                     '<div class="changes-fix-card">' +
                         '<div class="changes-fix-severity ' + sevClass + '">' + sevIcon + '</div>' +
@@ -167,7 +179,9 @@ function renderChangesPage() {
                             '<div class="changes-fix-msg">' + window.escHtml(fix.message) + '</div>' +
                             '<div class="changes-fix-meta">' +
                                 (fix.element_name ? '<span class="changes-fix-element">' + window.escHtml(fix.element_name) + '</span>' : '') +
-                                (eidStr ? '<span class="changes-fix-element" style="font-size:10px;color:var(--text-secondary)">' + window.escHtml(eidStr) + '</span>' : '') +
+                                (cubeStr ? '<span class="changes-fix-id" style="font-size:11px;color:#f59e0b">🧊 CUBE: ' + window.escHtml(cubeStr) + '</span>' : '') +
+                                (revitStr ? '<span class="changes-fix-id" style="font-size:11px;color:#52d399">⚙ Revit: ' + window.escHtml(revitStr) + '</span>' : '') +
+                                (ifcStr ? '<span class="changes-fix-id" style="font-size:10px;color:var(--text-secondary)">🏷 IFC: ' + window.escHtml(ifcStr) + '</span>' : '') +
                                 (fix.rule_key ? '<span class="changes-fix-rule">' + window.escHtml(fix.rule_key) + '</span>' : '') +
                             '</div>' +
                         '</div>' +
