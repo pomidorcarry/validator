@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
 using System.Windows.Forms;
 
 namespace LynxRevitPlugin
@@ -10,6 +11,8 @@ namespace LynxRevitPlugin
         public string ElementName { get; set; }
         public string Description { get; set; }
         public bool Success { get; set; }
+        public bool IsWarning { get; set; }
+        public string WarningMessage { get; set; }
         public string RevitIds { get; set; }
         public string ErrorMessage { get; set; }
         public List<string> StepResults { get; set; }
@@ -28,12 +31,14 @@ namespace LynxRevitPlugin
         private static readonly Color GreenOk = Color.FromArgb(76, 175, 80);
         private static readonly Color RedError = Color.FromArgb(244, 67, 54);
         private static readonly Color DarkBorder = Color.FromArgb(40, 40, 80);
+        private static readonly Color YellowWarn = Color.FromArgb(255, 193, 7);
 
         private FlowLayoutPanel _resultsPanel;
         private Label _summaryLabel;
         private Label _statusIcon;
         private readonly int _applied;
         private readonly int _failed;
+        private readonly int _warnings;
         private readonly List<FixReportEntry> _entries;
 
         public FixResultForm(int applied, int failed, List<FixReportEntry> entries)
@@ -41,6 +46,7 @@ namespace LynxRevitPlugin
             _applied = applied;
             _failed = failed;
             _entries = entries ?? new List<FixReportEntry>();
+            _warnings = _entries.Count(e => e.IsWarning);
             InitializeComponent();
         }
 
@@ -64,11 +70,14 @@ namespace LynxRevitPlugin
                 Padding = new Padding(20, 14, 20, 10),
             };
 
+            bool hasWarning = _warnings > 0;
+            bool hasError = _failed > 0;
+
             _statusIcon = new Label
             {
-                Text = _failed > 0 ? "\u2716" : "\u2714",
+                Text = hasError ? "\u2716" : hasWarning ? "\u26A0" : "\u2714",
                 Font = new Font("Segoe UI", 28, FontStyle.Bold),
-                ForeColor = _failed > 0 ? RedError : GreenOk,
+                ForeColor = hasError ? RedError : hasWarning ? YellowWarn : GreenOk,
                 Left = 20,
                 Top = 16,
                 Width = 50,
@@ -79,19 +88,21 @@ namespace LynxRevitPlugin
 
             _summaryLabel = new Label
             {
-                Text = $"Применено: {_applied}  |  Ошибок: {_failed}",
+                Text = $"Применено: {_applied}  |  Предупреждений: {_warnings}  |  Ошибок: {_failed}",
                 Font = new Font("Segoe UI", 14, FontStyle.Bold),
                 ForeColor = TextPrimary,
                 Left = 80,
                 Top = 18,
-                Width = 400,
+                Width = 500,
                 Height = 24,
                 BackColor = Color.Transparent,
             };
 
             var detailHint = new Label
             {
-                Text = _failed > 0 ? "Некоторые исправления завершились с ошибкой. Подробности ниже." : "Все исправления успешно применены.",
+                Text = hasError ? "Некоторые исправления завершились с ошибкой. Подробности ниже."
+                     : hasWarning ? "Некоторые замечания требуют ручного исправления. Подробности ниже."
+                     : "Все исправления успешно применены.",
                 Font = new Font("Segoe UI", 9),
                 ForeColor = TextMuted,
                 Left = 80,
@@ -198,11 +209,12 @@ namespace LynxRevitPlugin
                         e.Graphics.DrawRectangle(pen, 0, 0, c.Width - 1, c.Height - 1);
                 };
 
+                bool isWarn = entry.IsWarning && entry.Success;
                 var icon = new Label
                 {
-                    Text = entry.Success ? "\u2714" : "\u2716",
+                    Text = isWarn ? "\u26A0" : entry.Success ? "\u2714" : "\u2716",
                     Font = new Font("Segoe UI", 14, FontStyle.Bold),
-                    ForeColor = entry.Success ? GreenOk : RedError,
+                    ForeColor = isWarn ? YellowWarn : entry.Success ? GreenOk : RedError,
                     Left = 10,
                     Top = 10,
                     Width = 24,
@@ -281,9 +293,9 @@ namespace LynxRevitPlugin
                     {
                         var stepLabel = new Label
                         {
-                            Text = "  \u2192 " + step,
-                            Font = new Font("Segoe UI", 8),
-                            ForeColor = TextMuted,
+                            Text = "  " + (isWarn ? "\u26A0" : "\u2192") + " " + step,
+                            Font = new Font("Segoe UI", 8, isWarn ? FontStyle.Regular : FontStyle.Regular),
+                            ForeColor = isWarn ? YellowWarn : TextMuted,
                             Left = 40,
                             Top = stepTop,
                             Width = cardWidth - 60,
