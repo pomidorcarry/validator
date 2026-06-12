@@ -38,6 +38,9 @@ async def init_db():
                     conn.execute(sa.text(f"ALTER TABLE projects ADD COLUMN {col} TEXT"))
             if "pipeline_data" not in proj_cols2:
                 conn.execute(sa.text("ALTER TABLE projects ADD COLUMN pipeline_data JSON"))
+            proj_cols3 = [c["name"] for c in insp.get_columns("projects")]
+            if "other_docs_summary" not in proj_cols3:
+                conn.execute(sa.text("ALTER TABLE projects ADD COLUMN other_docs_summary TEXT"))
             mv_cols = [c["name"] for c in insp.get_columns("model_versions")]
             if "version_number" not in mv_cols:
                 conn.execute(sa.text("ALTER TABLE model_versions ADD COLUMN version_number INTEGER"))

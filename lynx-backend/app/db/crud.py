@@ -598,6 +598,7 @@ async def get_project_tz(project_id: str) -> Optional[dict]:
             "sections_count": p.sections_count or "",
             "floors_count": p.floors_count or "",
             "bim_requirements": p.bim_requirements or "",
+            "other_docs_summary": p.other_docs_summary or "",
             "pipeline_data": p.pipeline_data or {},
             "tz_files": file_list,
             "tz_details": tz_details,

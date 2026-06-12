@@ -474,3 +474,210 @@ async def get_tz_history(project_id: str):
 
     history = await _get_history(project_id)
     return {"versions": history, "count": len(history)}
+
+
+# ─── Other source documents ─────────────────────────────────────────
+
+OTHER_DOCS_STORAGE = Path(settings.storage_path) / "other_docs"
+
+
+@router.get("/projects/{project_id}/other-docs")
+async def get_other_docs(project_id: str):
+    from ...db.models import get_project_tz as _get_tz
+    tz = await _get_tz(project_id)
+    if tz is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    other_dir = OTHER_DOCS_STORAGE / project_id
+    files = []
+    if other_dir.exists():
+        from datetime import datetime
+        for f in sorted(other_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
+            if f.is_file() and f.suffix.lower() in (".pdf", ".xlsx", ".xls"):
+                mtime = datetime.fromtimestamp(f.stat().st_mtime)
+                display_name = f.stem
+                meta_file = f.with_name(f.name + ".meta")
+                if meta_file.exists():
+                    try:
+                        import json as _json
+                        meta = _json.loads(meta_file.read_text(encoding="utf-8"))
+                        display_name = meta.get("original_name", f.stem)
+                    except Exception:
+                        pass
+                files.append({
+                    "stored_name": f.name,
+                    "display_name": display_name,
+                    "size_bytes": f.stat().st_size,
+                    "uploaded_at": mtime.isoformat(),
+                })
+
+    return {
+        "files": files,
+        "summary": tz.get("other_docs_summary", ""),
+    }
+
+
+@router.post("/projects/{project_id}/other-docs/upload", status_code=201)
+async def upload_other_doc(project_id: str, file: UploadFile = File(...)):
+    allowed = (".pdf", ".xlsx", ".xls")
+    ext = Path(file.filename).suffix.lower() if file.filename else ""
+    if ext not in allowed:
+        raise HTTPException(status_code=400, detail="Only PDF and Excel files allowed")
+
+    from datetime import datetime
+    import uuid
+
+    other_dir = OTHER_DOCS_STORAGE / project_id
+    other_dir.mkdir(parents=True, exist_ok=True)
+
+    ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    stored_name = f"{ts}_{uuid.uuid4().hex[:8]}{ext}"
+    dst = other_dir / stored_name
+
+    with dst.open("wb") as f:
+        content = await file.read()
+        f.write(content)
+
+    import json as _json
+    meta_file = dst.with_name(dst.name + ".meta")
+    meta_file.write_text(_json.dumps({"original_name": file.filename}))
+
+    now = datetime.utcnow()
+    return {
+        "file_name": file.filename,
+        "stored_name": stored_name,
+        "file_path": str(dst),
+        "uploaded_at": now.isoformat(),
+    }
+
+
+@router.post("/projects/{project_id}/other-docs/parse")
+async def parse_other_doc(project_id: str, filename: str = ""):
+    if DEMO_MODE:
+        return _demo_other_docs_response()
+
+    other_dir = OTHER_DOCS_STORAGE / project_id
+    if not other_dir.exists():
+        raise HTTPException(status_code=400, detail="No other docs found for this project")
+
+    if filename:
+        file_path = other_dir / filename
+    else:
+        doc_files = sorted(other_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)
+        doc_files = [f for f in doc_files if f.is_file() and f.suffix.lower() in (".pdf", ".xlsx", ".xls")]
+        if not doc_files:
+            raise HTTPException(status_code=400, detail="No other docs found")
+        file_path = doc_files[0]
+
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+
+    from ...services.ai.tz_parser import extract_text_from_file
+    text = extract_text_from_file(str(file_path))
+    if not text.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Не удалось извлечь текст из файла. Возможно, PDF отсканирован или содержит только изображения. Попробуйте загрузить текст вручную."
+        )
+
+    from ...services.ai.tz_parser import parse_tz_document
+    parsed = await parse_tz_document(text)
+    summary = _build_other_docs_summary(parsed, file_path.name)
+    return {"summary": summary, "_source_file": file_path.name}
+
+
+@router.put("/projects/{project_id}/other-docs")
+async def save_other_docs(project_id: str, data: dict = Body(...)):
+    from ...db.base import async_session
+    from ...db.models_orm import Project
+    from sqlalchemy import select
+
+    async with async_session() as session:
+        result = await session.execute(select(Project).where(Project.id == project_id))
+        proj = result.scalar_one_or_none()
+        if proj is None:
+            raise HTTPException(status_code=404, detail="Project not found")
+
+        proj.other_docs_summary = data.get("summary", "")
+        await session.commit()
+        return {"status": "ok", "summary": proj.other_docs_summary}
+
+
+@router.delete("/projects/{project_id}/other-docs/files")
+async def delete_other_doc(project_id: str, filename: str = ""):
+    if not filename:
+        raise HTTPException(status_code=400, detail="filename is required")
+
+    other_dir = OTHER_DOCS_STORAGE / project_id
+    file_path = other_dir / filename
+    meta_path = other_dir / (filename + ".meta")
+
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+
+    file_path.unlink()
+    if meta_path.exists():
+        meta_path.unlink()
+
+    return {"deleted": filename}
+
+
+@router.get("/projects/{project_id}/other-docs/file")
+async def download_other_doc(project_id: str, filename: str = ""):
+    from fastapi.responses import FileResponse
+
+    other_dir = OTHER_DOCS_STORAGE / project_id
+    if not other_dir.exists():
+        raise HTTPException(status_code=404, detail="No files found")
+
+    if filename:
+        file_path = other_dir / filename
+    else:
+        doc_files = sorted(other_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)
+        doc_files = [f for f in doc_files if f.is_file() and f.suffix.lower() in (".pdf", ".xlsx", ".xls")]
+        if not doc_files:
+            raise HTTPException(status_code=404, detail="No files found")
+        file_path = doc_files[0]
+
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+
+    display_name = file_path.name[20:] if "_" in file_path.name and len(file_path.name) > 20 else file_path.name
+    return FileResponse(path=str(file_path), filename=display_name)
+
+
+def _demo_other_docs_response() -> dict:
+    return {
+        "summary": (
+            "Загружен файл «Стадия П. 37-21-ИОС2 (Изм.6)» — раздел ИОС2 (водоснабжение и водоотведение).\n"
+            "Основные решения:\n"
+            "- Запроектирована система хозяйственно-питьевого водоснабжения В1 (DN100 ввод, DN80 магистрали).\n"
+            "- Противопожарный водопровод В2.1–В2.7 с кольцеванием и пожарными гидрантами.\n"
+            "- Система канализации К1, К2 с самотечными выпусками, диаметры 50–150 мм.\n"
+            "- Материалы: полипропилен для внутренней канализации, стальные трубы для водоснабжения.\n"
+            "- Тепловая изоляция трубопроводов: 13 мм для холодной воды, 20 мм для горячей воды и циркуляции.\n"
+            "Требуется уточнить материал изготовления для участков в электрощитовой и диаметр ввода согласно стадии П."
+        ),
+        "_source_file": "37-21-ИОС2 (Изм.6).pdf",
+    }
+
+
+def _build_other_docs_summary(parsed: dict, source_file: str) -> str:
+    """Build a brief human-readable summary from AI-parsed document data."""
+    lines = [f"Анализ файла: {source_file}"]
+    if parsed.get("tz_water_supply"):
+        lines.append(f"\nВодоснабжение: {parsed['tz_water_supply'][:300]}")
+    if parsed.get("tz_sewerage"):
+        lines.append(f"Водоотведение: {parsed['tz_sewerage'][:300]}")
+    if parsed.get("tz_fire_fighting"):
+        lines.append(f"Пожаротушение: {parsed['tz_fire_fighting'][:300]}")
+    if parsed.get("tz_general"):
+        lines.append(f"Общее: {parsed['tz_general'][:300]}")
+    if parsed.get("tz_other"):
+        lines.append(f"Прочее: {parsed['tz_other'][:300]}")
+    pipeline = parsed.get("pipeline_systems", [])
+    if pipeline:
+        lines.append(f"\nОбнаружено систем: {len(pipeline)}")
+    if not lines[1:]:
+        lines.append("Не удалось выделить структурированные данные. Приведён краткий пересказ документа.")
+    return "\n".join(lines)

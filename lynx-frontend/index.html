@@ -197,6 +197,7 @@
                             <span class="data-tab" data-tab="tz" onclick="switchDataTab('tz')">📄 ТЗ проекта</span>
                             <span class="data-tab" data-tab="ai-check" onclick="switchDataTab('ai-check')">🧠 Проверка с ИИ</span>
                             <span class="data-tab" data-tab="vendor" onclick="switchDataTab('vendor')">🏭 Производители</span>
+                            <span class="data-tab" data-tab="other-docs" onclick="switchDataTab('other-docs')">📁 Исходные данные</span>
                             <span class="data-tab" data-tab="changes" onclick="switchDataTab('changes')">🔄 Внесение изменений</span>
                         </div>
                         <span style="flex:1"></span>
@@ -292,6 +293,32 @@
                                     <input class="form-input vendor-mfr-input" id="mfr_ff_additional" placeholder="Шкафы НПО Пульс, оросители СВУ/ДВУ..." />
                                 </div>
                             </details>
+                        </div>
+                    </div>
+                    <div id="dataOtherDocsTab" class="data-scroll" style="flex:1;overflow-y:auto;padding:16px;display:none">
+                        <div class="tz-file-block">
+                            <div style="font-size:13px;font-weight:600;margin-bottom:8px">Файлы исходных данных</div>
+                            <div id="otherDocsFileList" style="margin-bottom:12px;font-size:13px;color:var(--text-secondary)">Файлов нет</div>
+                            <div class="tz-file-actions">
+                                <button class="btn" onclick="document.getElementById('otherDocsFileInput').click()">📄 Загрузить PDF/Excel</button>
+                                <input type="file" id="otherDocsFileInput" accept=".pdf,.xlsx,.xls" style="display:none" onchange="uploadOtherDoc(this.files[0])" />
+                                <button class="btn" id="btnParseOtherDoc" onclick="parseOtherDocAi()" disabled>⚡ Проанализировать</button>
+                                <button class="btn btn-outline" id="btnDownloadOtherDoc" onclick="downloadOtherDoc()" style="display:none">📥 Скачать</button>
+                            </div>
+                            <div style="margin-top:8px;font-size:12px;color:var(--text-secondary)">
+                                Загрузите стадию ПД, информацию от смежников, производителей или иные исходные данные.
+                            </div>
+                        </div>
+
+                        <div style="margin-top:20px">
+                            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                                <span style="font-size:14px;font-weight:600">Анализ документа</span>
+                                <button class="btn btn-primary" id="btnSaveOtherDocSummary" onclick="saveOtherDocSummary()" style="font-size:13px" disabled>💾 Сохранить</button>
+                            </div>
+                            <div id="otherDocParseStatus" style="font-size:13px;color:var(--text-secondary);margin-bottom:8px">
+                                Загрузите и проанализируйте файл, чтобы увидеть краткое содержание.
+                            </div>
+                            <textarea class="form-textarea" id="otherDocSummary" rows="12" placeholder="Здесь отобразится краткое содержание документа после анализа ИИ..." style="width:100%"></textarea>
                         </div>
                     </div>
                     <div id="dataChangesTab" class="data-scroll" style="flex:1;overflow-y:auto;padding:16px;display:none">
@@ -548,6 +575,22 @@
             <div class="modal-footer">
                 <button class="btn btn-outline" onclick="closeModal('tzPreviewModal')">Отмена</button>
                 <button class="btn btn-primary" id="tzPreviewApplyBtn" onclick="applyTzPreview()">✅ Применить</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="otherDocsPreviewModal">
+        <div class="modal" style="width:80%;max-width:800px">
+            <div class="modal-header">
+                <h2>Анализ исходных данных ИИ</h2>
+                <button class="modal-close" onclick="closeModal('otherDocsPreviewModal')">✕</button>
+            </div>
+            <div class="modal-body" style="max-height:60vh;overflow-y:auto">
+                <div id="otherDocsPreviewContent" style="white-space:pre-wrap;font-size:14px;line-height:1.6;color:var(--text)"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeModal('otherDocsPreviewModal')">Отмена</button>
+                <button class="btn btn-primary" id="otherDocsPreviewApplyBtn" onclick="applyOtherDocsPreview()">✅ Применить</button>
             </div>
         </div>
     </div>

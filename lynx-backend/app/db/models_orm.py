@@ -26,6 +26,7 @@ class Project(Base):
     sections_count = Column(Text, default="")
     floors_count = Column(Text, default="")
     bim_requirements = Column(Text, default="")
+    other_docs_summary = Column(Text, default="")
     pipeline_data = Column(JSON, default=dict)
     created_at = Column(DateTime, default=datetime.utcnow)
 

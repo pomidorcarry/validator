@@ -130,6 +130,7 @@ window.switchDataTab = function(tab) {
     document.getElementById('dataAiCheckTab').style.display = tab === 'ai-check' ? '' : 'none';
     document.getElementById('aiCheckResults').style.display = tab === 'ai-check' ? '' : 'none';
     document.getElementById('dataVendorTab').style.display = tab === 'vendor' ? '' : 'none';
+    document.getElementById('dataOtherDocsTab').style.display = tab === 'other-docs' ? '' : 'none';
     document.getElementById('dataChangesTab').style.display = tab === 'changes' ? '' : 'none';
     document.querySelector('.categories-only').style.display = tab === 'categories' ? '' : 'none';
     document.querySelector('.tz-only').style.display = tab === 'tz' ? '' : 'none';
@@ -140,12 +141,14 @@ window.switchDataTab = function(tab) {
         'tz': 'Редактирование технического задания',
         'ai-check': 'Проверка модели с использованием ИИ',
         'vendor': 'Анализ рекомендуемых производителей',
+        'other-docs': 'Загрузка исходных данных (стадия П, смежники, производители)',
         'changes': 'Создание и отправка приказов на изменение модели в Revit',
     };
     document.getElementById('dataPageMeta').textContent = labels[tab] || '';
     if (tab === 'tz') loadTzSection();
     if (tab === 'ai-check') window.loadAiCheck();
     if (tab === 'vendor') loadVendorSection();
+    if (tab === 'other-docs') loadOtherDocsSection();
     if (tab === 'changes') window.loadChangesTab();
 };
 
@@ -1008,3 +1011,154 @@ window.saveVendorSection = async function() {
         window.showToast('Ошибка сохранения: ' + e.message, 'error');
     }
 };
+
+
+// ── Other source documents ────────────────────────────────────────
+
+var _otherDocFiles = [];
+
+async function loadOtherDocsSection() {
+    try {
+        var resp = await fetch(window.API_BASE + '/projects/' + window.currentProjectId + '/other-docs');
+        var data = await resp.json();
+        _otherDocFiles = data.files || [];
+        renderOtherDocFileList();
+        document.getElementById('otherDocSummary').value = data.summary || '';
+        document.getElementById('btnSaveOtherDocSummary').disabled = true;
+    } catch (e) {
+        window.showToast('Ошибка загрузки: ' + e.message, 'error');
+    }
+}
+
+function renderOtherDocFileList() {
+    var container = document.getElementById('otherDocsFileList');
+    if (!_otherDocFiles.length) {
+        container.innerHTML = 'Файлов нет';
+        document.getElementById('btnParseOtherDoc').disabled = true;
+        document.getElementById('btnDownloadOtherDoc').style.display = 'none';
+        return;
+    }
+
+    var html = '<div style="display:flex;flex-direction:column;gap:4px">';
+    _otherDocFiles.forEach(function(f, i) {
+        var selected = i === 0 ? 'checked' : '';
+        html += '<label style="display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--border);border-radius:4px;cursor:pointer">';
+        html += '<input type="radio" name="otherDocFile" value="' + window.escHtml(f.stored_name) + '" ' + selected + ' onchange="onOtherDocFileSelect()" />';
+        html += '<span>' + window.escHtml(f.display_name) + '</span>';
+        html += '<span style="color:var(--text-secondary);font-size:11px">' + formatSize(f.size_bytes) + '</span>';
+        html += '<span style="flex:1"></span>';
+        html += '<span style="color:var(--text-secondary);font-size:11px">' + (f.uploaded_at || '').substring(0, 10) + '</span>';
+        html += '</label>';
+    });
+    html += '</div>';
+    container.innerHTML = html;
+    document.getElementById('btnParseOtherDoc').disabled = false;
+    document.getElementById('btnDownloadOtherDoc').style.display = '';
+}
+
+window.onOtherDocFileSelect = function() {
+    document.getElementById('btnParseOtherDoc').disabled = false;
+};
+
+window.uploadOtherDoc = async function(file) {
+    if (!file) return;
+    var form = new FormData();
+    form.append('file', file);
+    try {
+        var resp = await fetch(window.API_BASE + '/projects/' + window.currentProjectId + '/other-docs/upload', {
+            method: 'POST',
+            body: form,
+        });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        window.showToast('Файл загружен', 'success');
+        await loadOtherDocsSection();
+    } catch (e) {
+        window.showToast('Ошибка загрузки: ' + e.message, 'error');
+    }
+};
+
+window.parseOtherDocAi = async function() {
+    var selected = document.querySelector('input[name="otherDocFile"]:checked');
+    if (!selected) {
+        window.showToast('Выберите файл для анализа', 'error');
+        return;
+    }
+    var filename = selected.value;
+    var btn = document.getElementById('btnParseOtherDoc');
+    btn.disabled = true;
+    btn.textContent = '⏳ Анализ...';
+    document.getElementById('otherDocParseStatus').textContent = 'Идёт анализ документа...';
+
+    try {
+        var resp = await fetch(window.API_BASE + '/projects/' + window.currentProjectId + '/other-docs/parse?filename=' + encodeURIComponent(filename), {
+            method: 'POST',
+        });
+
+        if (!resp.ok) {
+            var errText = await resp.text();
+            var errMsg = 'Ошибка анализа';
+            try {
+                var errJson = JSON.parse(errText);
+                errMsg = errJson.detail || errMsg;
+            } catch(e2) {}
+            window.showToast(errMsg, 'error');
+            document.getElementById('otherDocParseStatus').textContent = errMsg;
+            btn.disabled = false;
+            btn.textContent = '⚡ Проанализировать';
+            return;
+        }
+
+        var data = await resp.json();
+        var summary = data.summary || 'Не удалось получить анализ документа.';
+        window._otherDocsPendingSummary = summary;
+        document.getElementById('otherDocsPreviewContent').textContent = summary;
+        window.openModal('otherDocsPreviewModal');
+        document.getElementById('otherDocParseStatus').textContent = 'Анализ завершён. Просмотрите в окне предпросмотра.';
+    } catch (e) {
+        window.showToast('Ошибка: ' + e.message, 'error');
+        document.getElementById('otherDocParseStatus').textContent = 'Ошибка при анализе документа.';
+    }
+
+    btn.disabled = false;
+    btn.textContent = '⚡ Проанализировать';
+};
+
+window.applyOtherDocsPreview = function() {
+    var summary = window._otherDocsPendingSummary || '';
+    document.getElementById('otherDocSummary').value = summary;
+    document.getElementById('otherDocParseStatus').textContent = 'Анализ завершён. Отредактируйте при необходимости и нажмите «Сохранить».';
+    document.getElementById('btnSaveOtherDocSummary').disabled = false;
+    window.closeModal('otherDocsPreviewModal');
+    window.showToast('Анализ применён', 'success');
+};
+
+window.saveOtherDocSummary = async function() {
+    var summary = document.getElementById('otherDocSummary').value;
+    try {
+        var resp = await fetch(window.API_BASE + '/projects/' + window.currentProjectId + '/other-docs', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ summary: summary }),
+        });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        window.showToast('Сохранено', 'success');
+        document.getElementById('btnSaveOtherDocSummary').disabled = true;
+    } catch (e) {
+        window.showToast('Ошибка сохранения: ' + e.message, 'error');
+    }
+};
+
+window.downloadOtherDoc = function() {
+    var selected = document.querySelector('input[name="otherDocFile"]:checked');
+    if (!selected) return;
+    var filename = selected.value;
+    var url = window.API_BASE + '/projects/' + window.currentProjectId + '/other-docs/file?filename=' + encodeURIComponent(filename);
+    window.open(url, '_blank');
+};
+
+function formatSize(bytes) {
+    if (!bytes) return '';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1048576).toFixed(1) + ' MB';
+}
