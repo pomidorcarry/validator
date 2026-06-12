@@ -512,6 +512,10 @@ function renderOrderDetailModal(order) {
     // Action buttons — only for draft orders
     html += '<div class="order-detail-actions" style="margin-top:20px;display:flex;gap:8px;flex-wrap:wrap">';
     if (order.status === 'draft') {
+        var hasPending = fixes.some(function(f) { return f.status === 'pending'; });
+        if (hasPending) {
+            html += '<button class="btn btn-primary" onclick="approveAllFixesInOrder(\'' + order.id + '\')">✅ Утвердить все</button>';
+        }
         html += '<button class="btn btn-primary" onclick="sendAndApplyOrder(\'' + order.id + '\')">🚀 Отправить в Revit и реализовать</button>';
         html += '<button class="btn" onclick="elaborateAllInOrder(\'' + order.id + '\')" style="border-color:var(--accent);color:var(--accent)">💡 Продумать все</button>';
     }
@@ -536,6 +540,36 @@ function renderFixActions(actions) {
 
 window.approveFixInOrder = async function(orderId, fixIndex) {
     await updateFixStatus(orderId, fixIndex, 'approved');
+};
+
+window.approveAllFixesInOrder = async function(orderId) {
+    var order = _changeOrders.find(function(o) { return o.id === orderId; });
+    if (!order) return;
+
+    var pendingFixes = [];
+    (order.fixes || []).forEach(function(f, idx) {
+        if (f.status === 'pending') {
+            f.status = 'approved';
+            pendingFixes.push({ id: f.id, status: 'approved' });
+        }
+    });
+
+    if (pendingFixes.length === 0) return;
+
+    try {
+        var resp = await fetch(window.API_BASE + '/projects/' + window.currentProjectId + '/changes/' + orderId, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fixes: pendingFixes }),
+        });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        var updatedOrder = _changeOrders.find(function(o) { return o.id === orderId; });
+        if (updatedOrder) renderOrderDetailModal(updatedOrder);
+        renderChangesPage();
+        window.showToast('Утверждено исправлений: ' + pendingFixes.length, 'success');
+    } catch(e) {
+        window.showToast('Ошибка: ' + e.message, 'error');
+    }
 };
 
 window.rejectFixInOrder = async function(orderId, fixIndex) {
