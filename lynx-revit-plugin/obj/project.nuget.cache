@@ -1,8 +1,10 @@
 {
   "version": 2,
-  "dgSpecHash": "IhbGCi62n6s=",
+  "dgSpecHash": "36VkRfse7vc=",
   "success": true,
   "projectFilePath": "C:\\Users\\varsic\\Desktop\\open_code_vibe_coding\\RevitExtension_validation\\lynx-revit-plugin\\LynxRevitPlugin.csproj",
-  "expectedPackageFiles": [],
+  "expectedPackageFiles": [
+    "C:\\Users\\varsic\\.nuget\\packages\\microsoft.web.webview2\\1.0.3856.49\\microsoft.web.webview2.1.0.3856.49.nupkg.sha512"
+  ],
   "logs": []
 }

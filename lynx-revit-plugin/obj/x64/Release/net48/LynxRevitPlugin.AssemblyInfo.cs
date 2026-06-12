@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("LynxRevitPlugin")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+9c86e11a9c6a44a9f16f4c86558bd4f1f5ea2b48")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+ba76fb4e020016c296128ab306ac6e0be55a94a5")]
 [assembly: System.Reflection.AssemblyProductAttribute("LynxRevitPlugin")]
 [assembly: System.Reflection.AssemblyTitleAttribute("LynxRevitPlugin")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

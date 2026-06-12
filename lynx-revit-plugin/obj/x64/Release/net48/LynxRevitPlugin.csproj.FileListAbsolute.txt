@@ -1,10 +1,15 @@
+C:\Users\varsic\Desktop\open_code_vibe_coding\RevitExtension_validation\lynx-revit-plugin\bin\x64\Release\net48\runtimes\win-x64\native\WebView2Loader.dll
+C:\Users\varsic\Desktop\open_code_vibe_coding\RevitExtension_validation\lynx-revit-plugin\bin\x64\Release\net48\LynxRevitPlugin.dll
+C:\Users\varsic\Desktop\open_code_vibe_coding\RevitExtension_validation\lynx-revit-plugin\bin\x64\Release\net48\LynxRevitPlugin.pdb
+C:\Users\varsic\Desktop\open_code_vibe_coding\RevitExtension_validation\lynx-revit-plugin\bin\x64\Release\net48\Microsoft.Web.WebView2.Core.dll
+C:\Users\varsic\Desktop\open_code_vibe_coding\RevitExtension_validation\lynx-revit-plugin\bin\x64\Release\net48\Microsoft.Web.WebView2.WinForms.dll
+C:\Users\varsic\Desktop\open_code_vibe_coding\RevitExtension_validation\lynx-revit-plugin\bin\x64\Release\net48\Microsoft.Web.WebView2.Wpf.dll
 C:\Users\varsic\Desktop\open_code_vibe_coding\RevitExtension_validation\lynx-revit-plugin\obj\x64\Release\net48\LynxRevitPlugin.csproj.AssemblyReference.cache
 C:\Users\varsic\Desktop\open_code_vibe_coding\RevitExtension_validation\lynx-revit-plugin\obj\x64\Release\net48\LynxRevitPlugin.GeneratedMSBuildEditorConfig.editorconfig
 C:\Users\varsic\Desktop\open_code_vibe_coding\RevitExtension_validation\lynx-revit-plugin\obj\x64\Release\net48\LynxRevitPlugin.AssemblyInfoInputs.cache
 C:\Users\varsic\Desktop\open_code_vibe_coding\RevitExtension_validation\lynx-revit-plugin\obj\x64\Release\net48\LynxRevitPlugin.AssemblyInfo.cs
 C:\Users\varsic\Desktop\open_code_vibe_coding\RevitExtension_validation\lynx-revit-plugin\obj\x64\Release\net48\LynxRevitPlugin.csproj.CoreCompileInputs.cache
 C:\Users\varsic\Desktop\open_code_vibe_coding\RevitExtension_validation\lynx-revit-plugin\obj\x64\Release\net48\LynxRevitPlugin.sourcelink.json
-C:\Users\varsic\Desktop\open_code_vibe_coding\RevitExtension_validation\lynx-revit-plugin\bin\x64\Release\net48\LynxRevitPlugin.dll
-C:\Users\varsic\Desktop\open_code_vibe_coding\RevitExtension_validation\lynx-revit-plugin\bin\x64\Release\net48\LynxRevitPlugin.pdb
+C:\Users\varsic\Desktop\open_code_vibe_coding\RevitExtension_validation\lynx-revit-plugin\obj\x64\Release\net48\LynxRevi.69B2D357.Up2Date
 C:\Users\varsic\Desktop\open_code_vibe_coding\RevitExtension_validation\lynx-revit-plugin\obj\x64\Release\net48\LynxRevitPlugin.dll
 C:\Users\varsic\Desktop\open_code_vibe_coding\RevitExtension_validation\lynx-revit-plugin\obj\x64\Release\net48\LynxRevitPlugin.pdb
