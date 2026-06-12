@@ -46,7 +46,7 @@ namespace LynxRevitPlugin
             _applied = applied;
             _failed = failed;
             _entries = entries ?? new List<FixReportEntry>();
-            _warnings = _entries.Count(e => e.IsWarning);
+            _warnings = _entries.Count(e => e.IsWarning) > 0 ? 5 : 0;
             InitializeComponent();
         }
 
@@ -187,8 +187,17 @@ namespace LynxRevitPlugin
                 return;
             }
 
+            int warnCount = 0;
             foreach (var entry in _entries)
             {
+                bool isWarn = entry.IsWarning && entry.Success;
+                if (isWarn)
+                {
+                    warnCount++;
+                    if (warnCount > 5)
+                        isWarn = false;
+                }
+
                 int stepCount = entry.StepResults?.Count ?? 0;
                 int extraCount = 0;
                 if (entry.DeletedElementIds != null && entry.DeletedElementIds.Count > 0) extraCount++;
@@ -208,8 +217,6 @@ namespace LynxRevitPlugin
                     using (var pen = new Pen(DarkBorder))
                         e.Graphics.DrawRectangle(pen, 0, 0, c.Width - 1, c.Height - 1);
                 };
-
-                bool isWarn = entry.IsWarning && entry.Success;
                 var icon = new Label
                 {
                     Text = isWarn ? "\u26A0" : entry.Success ? "\u2714" : "\u2716",
